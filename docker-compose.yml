@@ -1,0 +1,15 @@
+version: '3.0'
+
+services:
+
+  gobkafkaproducer:
+    build: src
+    container_name: gobkafkaproducer
+    environment:
+      MESSAGE_BROKER_ADDRESS: rabbitmq
+      API_HOST: http://gobapi:8001
+
+networks:
+  default:
+    external:
+      name: gob-network
