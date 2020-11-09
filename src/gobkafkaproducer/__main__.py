@@ -54,7 +54,7 @@ def new_events_handler(msg):
             headers=headers,
         )
 
-    producer.flush()
+    producer.flush(timeout=30)
     print(f"Sent {len(msg['contents'])} events to Kafka")
 
 
