@@ -81,7 +81,7 @@ class TestMain(TestCase):
                     ('source', b'the source'),
                 ]
             ),
-            call.flush(),
+            call.flush(timeout=30),
         ])
 
 
