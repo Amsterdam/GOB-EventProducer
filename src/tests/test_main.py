@@ -18,7 +18,9 @@ class TestMain(TestCase):
         }
 
         msg = MagicMock()
-        new_events_notification_handler(msg)
+
+        with patch("gobkafkaproducer.__main__.LISTEN_TO_CATALOGS", ['CAT']):
+            new_events_notification_handler(msg)
         mock_get_notification.assert_called_with(msg)
 
         mock_start_workflow.assert_called_with({
@@ -29,6 +31,11 @@ class TestMain(TestCase):
             'application': 'APPL',
             'process_id': 'PID',
         })
+
+        # Ignore other catalogs
+        mock_start_workflow.reset_mock()
+        new_events_notification_handler(msg)
+        mock_start_workflow.assert_not_called()
 
     @patch("gobkafkaproducer.__main__.logger")
     @patch("gobkafkaproducer.__main__.KafkaEventProducer")
