@@ -17,8 +17,8 @@ DATABASE_CONFIG = {
     'drivername': 'postgres',
     'username': os.getenv("GOB_KAFKAPRODUCER_DATABASE_USER", "gob_kafka"),
     'password': os.getenv("GOB_KAFKAPRODUCER_DATABASE_PASSWORD", "insecure"),
-    'host': os.getenv("GOB_KAFKAPRODUCER_DATABASE_HOST_OVERRIDE", "localhost"),
-    'port': os.getenv("GOB_KAFKAPRODUCER_DATABASE_PORT_OVERRIDE", 5410),
+    'host': os.getenv("GOB_KAFKAPRODUCER_DATABASE_HOST", "localhost"),
+    'port': os.getenv("GOB_KAFKAPRODUCER_DATABASE_PORT", 5410),
     'database': os.getenv("GOB_KAFKAPRODUCER_DATABASE", 'gob_kafka'),
 }
 
