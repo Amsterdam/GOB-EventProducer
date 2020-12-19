@@ -9,8 +9,29 @@ services:
       MESSAGE_BROKER_ADDRESS: rabbitmq
       API_HOST: http://gobapi:8001
       GOB_SHARED_DIR: /app/shared
+      GOB_KAFKAPRODUCER_DATABASE_HOST: ${GOB_KAFKAPRODUCER_DATABASE_HOST}
+      GOB_KAFKAPRODUCER_DATABASE_USER: ${GOB_KAFKAPRODUCER_DATABASE_USER}
+      GOB_KAFKAPRODUCER_DATABASE_PASSWORD: ${GOB_KAFKAPRODUCER_DATABASE_PASSWORD}
+      GOB_KAFKAPRODUCER_DATABASE: ${GOB_KAFKAPRODUCER_DATABASE}
     volumes:
       - gob-volume:/app/shared
+
+  kafkaproducer_database:
+    image: amsterdam/postgres11
+    ports:
+      - "5410:5432"
+    container_name: kafkaproducer_database
+    environment:
+      POSTGRES_PASSWORD: insecure
+      POSTGRES_DB: gob_kafka
+      POSTGRES_USER: gob_kafka
+    volumes:
+      - "~/.ssh/datapunt.key:/root/.ssh/datapunt.key"
+    shm_size: '1gb'
+
+volumes:
+  gob-volume:
+    external: true
 
 networks:
   default:

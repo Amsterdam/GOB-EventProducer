@@ -1,91 +1,68 @@
 from unittest import TestCase
-from unittest.mock import patch, call
+from unittest.mock import patch, MagicMock, call
 
-from gobkafkaproducer.__main__ import init_listen_queue, _to_bytes, new_events_handler
+from gobkafkaproducer.__main__ import new_events_notification_handler, kafka_produce_handler
 
 
 class TestMain(TestCase):
 
+    @patch("gobkafkaproducer.__main__.get_notification")
+    @patch("gobkafkaproducer.__main__.start_workflow")
+    def test_new_events_notification_handler(self, mock_start_workflow, mock_get_notification):
+        mock_get_notification.return_value = MagicMock()
+        mock_get_notification.return_value.header = {
+            'catalogue': 'CAT',
+            'collection': 'COLL',
+            'application': 'APPL',
+            'process_id': 'PID',
+        }
+
+        msg = MagicMock()
+        new_events_notification_handler(msg)
+        mock_get_notification.assert_called_with(msg)
+
+        mock_start_workflow.assert_called_with({
+            'workflow_name': 'kafka_produce',
+        }, {
+            'catalogue': 'CAT',
+            'collection': 'COLL',
+            'application': 'APPL',
+            'process_id': 'PID',
+        })
+
+    @patch("gobkafkaproducer.__main__.logger")
+    @patch("gobkafkaproducer.__main__.KafkaEventProducer")
+    def test_kafka_produce_handler(self, mock_producer, mock_logger):
+        msg = {
+            'header': {
+                'catalogue': 'CAT',
+                'collection': 'COLL',
+            }
+        }
+        mock_producer.return_value.total_cnt = 14804
+
+        result = kafka_produce_handler(msg)
+        self.assertEqual({
+            **msg,
+            'summary': {
+                'produced': 14804,
+            }
+        }, result)
+
+        mock_producer.assert_has_calls([
+            call('CAT', 'COLL', mock_logger),
+            call().produce(),
+        ])
+
+        with self.assertRaises(AssertionError):
+            kafka_produce_handler({})
+
+    @patch("gobkafkaproducer.__main__.connect")
     @patch("gobkafkaproducer.__main__.MessagedrivenService")
-    def test_main_entry(self, mock_messagedriven_service):
+    def test_main_entry(self, mock_messagedriven_service, mock_connect):
         from gobkafkaproducer import __main__ as module
         with patch.object(module, "__name__", "__main__"):
             module.init()
+
+            mock_connect.assert_called_once()
             mock_messagedriven_service().start.assert_called_once()
-
-    @patch("gobkafkaproducer.__main__.create_queue_with_binding")
-    def test_init_listen_queue(self, mock_create_queue):
-        init_listen_queue()
-        mock_create_queue.assert_called_with('gob.event', 'gob.event.kafka', 'event.#')
-
-    @patch("gobkafkaproducer.__main__.KAFKA_TOPIC", 'the-topic-to-publish-to')
-    @patch("gobkafkaproducer.__main__.KAFKA_CONNECTION_CONFIG", {'config_key': 'config value'})
-    @patch("gobkafkaproducer.__main__.KafkaProducer")
-    def test_new_events_handler(self, mock_producer):
-        msg = {
-            'contents': [{
-                'header': {
-                    'name': 'ADD',
-                    'event_id': 1,
-                    'source_id': 248,
-                    'last_event_id': None,
-                    'catalog': 'the catalog',
-                    'collection': 'the collection',
-                    'source': 'the source',
-                },
-                'contents': {'event': 'contents'}
-            }, {
-                'header': {
-                    'name': 'MODIFY',
-                    'event_id': 2,
-                    'source_id': 247,
-                    'last_event_id': 48,
-                    'catalog': 'the catalog',
-                    'collection': 'the collection',
-                    'source': 'the source',
-                },
-                'contents': {'event': 'contents'}
-            }]
-        }
-
-        new_events_handler(msg)
-
-        mock_producer.assert_called_with(config_key='config value')
-
-        mock_producer.return_value.assert_has_calls([
-            call.send(
-                'the-topic-to-publish-to',
-                key=b'the catalog.the collection',
-                value=b'{"event": "contents"}',
-                headers=[
-                    ('event_type', b'ADD'),
-                    ('event_id', b'1'),
-                    ('source_id', b'248'),
-                    ('last_event', b''),
-                    ('catalog', b'the catalog'),
-                    ('collection', b'the collection'),
-                    ('source', b'the source'),
-                ]
-            ),
-            call.send(
-                'the-topic-to-publish-to',
-                key=b'the catalog.the collection',
-                value=b'{"event": "contents"}',
-                headers=[
-                    ('event_type', b'MODIFY'),
-                    ('event_id', b'2'),
-                    ('source_id', b'247'),
-                    ('last_event', b'48'),
-                    ('catalog', b'the catalog'),
-                    ('collection', b'the collection'),
-                    ('source', b'the source'),
-                ]
-            ),
-            call.flush(timeout=30),
-        ])
-
-
-    @patch("builtins.bytes")
-    def test_to_bytes(self, mock_bytes):
-        self.assertEqual(mock_bytes.return_value, _to_bytes('some string'))
-        mock_bytes.assert_called_with('some string', encoding='utf-8')

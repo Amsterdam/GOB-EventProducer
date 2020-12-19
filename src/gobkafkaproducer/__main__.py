@@ -1,73 +1,65 @@
-import json
-
-from kafka.producer import KafkaProducer
-
-from gobcore.message_broker.config import EVENT_EXCHANGE
-from gobcore.message_broker.events import NEW_EVENT_PREFIX
-from gobcore.message_broker.initialise_queues import create_queue_with_binding
+from gobcore.logging.logger import logger
+from gobcore.message_broker.config import KAFKA_PRODUCE, KAFKA_PRODUCE_QUEUE, KAFKA_PRODUCE_RESULT_KEY, \
+    WORKFLOW_EXCHANGE
 from gobcore.message_broker.messagedriven_service import MessagedrivenService
-from gobkafkaproducer.config import KAFKA_TOPIC, KAFKA_CONNECTION_CONFIG
-
-KAFKA_EVENTS_QUEUE = f"{EVENT_EXCHANGE}.kafka"
-
-
-def init_listen_queue():
-    """Receive all new events on the EVENTS_QUEUE
-
-    ALL events will be written to a single queue. This means we can only have ONE consumer instance of this
-    container running at the same time, otherwise the ordering of events isn't guaranteed.
-
-    TODO: Implement logic later to create one queue per routing key (of the form event.catalog,collection, for example
-    event.gebieden.buurten) and have exactly one instance of this container listening to any specific queue. This can
-    be done partly with RabbitMQ, but we need fail-over and proper handling. Have a go at this later.
-
-    :return:
-    """
-    create_queue_with_binding(EVENT_EXCHANGE, KAFKA_EVENTS_QUEUE, f"{NEW_EVENT_PREFIX}#")
-    return KAFKA_EVENTS_QUEUE
+from gobcore.message_broker.notifications import get_notification, listen_to_notifications
+from gobcore.workflow.start_workflow import start_workflow
+from gobkafkaproducer.database.connection import connect
+from gobkafkaproducer.producer import KafkaEventProducer
 
 
-def _to_bytes(s: str):
-    return bytes(s, encoding='utf-8')
+def new_events_notification_handler(msg):
+    notification = get_notification(msg)
 
-
-def new_events_handler(msg):
-    header_fields = {
-        'event_type': 'name',
-        'event_id': 'event_id',
-        'source_id': 'source_id',
-        'last_event': 'last_event_id',
-        'catalog': 'catalog',
-        'collection': 'collection',
-        'source': 'source',
+    workflow = {'workflow_name': KAFKA_PRODUCE}
+    arguments = {
+        'catalogue': notification.header.get('catalogue'),
+        'collection': notification.header.get('collection'),
+        'application': notification.header.get('application'),
+        'process_id': notification.header.get('process_id'),
     }
-    producer = KafkaProducer(**KAFKA_CONNECTION_CONFIG)
+    start_workflow(workflow, arguments)
 
-    for event in msg['contents']:
-        headers = [(k, _to_bytes(str(event['header'][v])) if event['header'][v] else b'')
-                   for k, v in header_fields.items()]
 
-        producer.send(
-            KAFKA_TOPIC,
-            key=_to_bytes(f"{event['header']['catalog']}.{event['header']['collection']}"),
-            value=_to_bytes(json.dumps(event['contents'])),
-            headers=headers,
-        )
+def kafka_produce_handler(msg):
+    logger.configure(msg, "KAFKA_PRODUCE")
+    logger.info("Produce Kafka events")
 
-    producer.flush(timeout=30)
-    print(f"Sent {len(msg['contents'])} events to Kafka")
+    catalogue = msg.get('header', {}).get('catalogue')
+    collection = msg.get('header', {}).get('collection')
+
+    assert catalogue and collection, "Missing catalogue and collection in header"
+
+    event_producer = KafkaEventProducer(catalogue, collection, logger)
+    event_producer.produce()
+
+    return {
+        'header': msg['header'],
+        'summary': {
+            'produced': event_producer.total_cnt,
+        }
+    }
 
 
 SERVICEDEFINITION = {
-    'event_to_hub': {
-        'queue': lambda: init_listen_queue(),
-        'handler': new_events_handler,
+    'event_to_hub_notification': {
+        'queue': lambda: listen_to_notifications("kafka", "events"),
+        'handler': new_events_notification_handler,
+    },
+    'event_to_hub_request': {
+        'queue': KAFKA_PRODUCE_QUEUE,
+        'handler': kafka_produce_handler,
+        'report': {
+            'exchange': WORKFLOW_EXCHANGE,
+            'key': KAFKA_PRODUCE_RESULT_KEY,
+        }
     }
 }
 
 
 def init():
     if __name__ == "__main__":
+        connect()
         MessagedrivenService(SERVICEDEFINITION, "KafkaProducer").start()
 
 
