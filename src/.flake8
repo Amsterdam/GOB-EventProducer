@@ -14,6 +14,7 @@ exclude=.git,
         scripts,
         */settings_commons.py,
         src/gobcore,
-        src/gobconfig
+        src/gobconfig,
+        alembic
 max-complexity=7
 max-line-length = 119
