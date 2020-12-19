@@ -30,3 +30,5 @@ GOB_DATABASE_CONFIG = {
     'host': os.getenv("GOB_DATABASE_HOST_OVERRIDE", "localhost"),
     'port': os.getenv("GOB_DATABASE_PORT_OVERRIDE", 5406),
 }
+
+LISTEN_TO_CATALOGS = os.getenv('LISTEN_TO_CATALOGS', '').split(',')

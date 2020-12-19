@@ -6,10 +6,14 @@ from gobcore.message_broker.notifications import get_notification, listen_to_not
 from gobcore.workflow.start_workflow import start_workflow
 from gobkafkaproducer.database.connection import connect
 from gobkafkaproducer.producer import KafkaEventProducer
+from gobkafkaproducer.config import LISTEN_TO_CATALOGS
 
 
 def new_events_notification_handler(msg):
     notification = get_notification(msg)
+
+    if notification.header.get('catalogue') not in LISTEN_TO_CATALOGS:
+        return
 
     workflow = {'workflow_name': KAFKA_PRODUCE}
     arguments = {
