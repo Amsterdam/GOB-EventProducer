@@ -25,4 +25,8 @@ RUN rm requirements.txt
 # Copy gobkafkaproducer module
 COPY gobkafkaproducer gobkafkaproducer
 
+# Copy alembic config
+COPY alembic alembic
+COPY alembic.ini alembic.ini
+
 CMD ["python", "-m", "gobkafkaproducer"]
