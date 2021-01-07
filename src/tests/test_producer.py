@@ -238,7 +238,7 @@ class TestKafkaEventProducerInit(TestCase):
         p.producer = MagicMock()
 
         p._flush(2480)
-        p.producer.flush.assert_called_with(timeout=30)
+        p.producer.flush.assert_called_with(timeout=120)
         p._set_last_eventid.assert_called_with(2480)
 
     @patch("gobkafkaproducer.producer.database_to_gobevent")
