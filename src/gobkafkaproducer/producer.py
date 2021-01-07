@@ -120,7 +120,7 @@ class KafkaEventProducer:
         )
 
     def _flush(self, last_eventid: int):
-        self.producer.flush(timeout=30)
+        self.producer.flush(timeout=120)
         self._set_last_eventid(last_eventid)
         print(f"Flushed Kafka events. Total events: {self.total_cnt}. Last event id: {last_eventid}")
 
