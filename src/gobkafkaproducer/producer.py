@@ -137,6 +137,9 @@ class KafkaEventProducer:
             self.total_cnt += 1
             last_eventid = gob_event.id
 
+            # event may have been edited in database_to_gobevent (migration version id). Explicitly detach from session
+            self.gob_db_session.expunge(event)
+
             if self.total_cnt % self.FLUSH_PER == 0:
                 self._flush(last_eventid)
 

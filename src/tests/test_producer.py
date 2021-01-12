@@ -254,6 +254,7 @@ class TestKafkaEventProducerInit(TestCase):
         p._get_events = MagicMock(return_value=[i for i in range(event_cnt)])
         p._add_event = MagicMock()
         p._flush = MagicMock()
+        p.gob_db_session = MagicMock()
         p.FLUSH_PER = 2
         mock_db_to_gobevent.side_effect = lambda i: MockEvent(i)
 
@@ -263,6 +264,13 @@ class TestKafkaEventProducerInit(TestCase):
         self.assertEqual(event_cnt, p._add_event.call_count)
         p._flush.assert_has_calls([
             call(1),
+            call(3),
+            call(4),
+        ])
+        p.gob_db_session.expunge.assert_has_calls([
+            call(0),
+            call(1),
+            call(2),
             call(3),
             call(4),
         ])
