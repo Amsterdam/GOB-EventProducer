@@ -101,12 +101,13 @@ class TestStorage(TestCase):
         gobkafkaproducer.database.connection.engine = MockedEngine()
         gobkafkaproducer.database.connection.session = MockedSession()
 
+    @mock.patch("gobkafkaproducer.database.connection.URL")
     @mock.patch("gobkafkaproducer.database.connection.migrate_storage")
     @mock.patch("gobkafkaproducer.database.connection.create_engine")
-    def test_connect(self, mock_create, mock_migrate):
+    def test_connect(self, mock_create, mock_migrate, mock_url):
         result = connect()
 
-        mock_create.assert_called()
+        mock_create.assert_called_with(mock_url.return_value, connect_args={'sslmode': 'require'})
         mock_migrate.assert_called()
         self.assertEqual(result, True)
         self.assertEqual(is_connected(), True)
