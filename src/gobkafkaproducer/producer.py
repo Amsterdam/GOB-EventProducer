@@ -38,7 +38,7 @@ class KafkaEventProducer:
 
         :return:
         """
-        engine = create_engine(URL(**GOB_DATABASE_CONFIG))
+        engine = create_engine(URL(**GOB_DATABASE_CONFIG), connect_args={'sslmode': 'require'})
         self.gob_db_session = Session(engine)
         meta = MetaData()
         meta.reflect(engine, only=['events'])
@@ -52,7 +52,7 @@ class KafkaEventProducer:
 
         :return:
         """
-        engine = create_engine(URL(**DATABASE_CONFIG))
+        engine = create_engine(URL(**DATABASE_CONFIG), connect_args={'sslmode': 'require'})
         Base.metadata.bind = engine
         self.db_session = Session(engine)
 
