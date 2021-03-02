@@ -52,7 +52,7 @@ class TestKafkaEventProducerInit(TestCase):
         # Check initialisation of session
         self.assertEqual(mock_session.return_value, p.gob_db_session)
         mock_session.assert_called_with(mock_create_engine.return_value)
-        mock_create_engine.assert_called_with(mock_url.return_value)
+        mock_create_engine.assert_called_with(mock_url.return_value, connect_args={'sslmode': 'require'})
         mock_url.assert_called_with(db='config')
 
         # Check that Event obj is mapped and set correctly
@@ -79,7 +79,7 @@ class TestKafkaEventProducerInit(TestCase):
         # Check initialisation of session
         self.assertEqual(mock_session.return_value, p.db_session)
         mock_session.assert_called_with(mock_create_engine.return_value)
-        mock_create_engine.assert_called_with(mock_url.return_value)
+        mock_create_engine.assert_called_with(mock_url.return_value, connect_args={'sslmode': 'require'})
         mock_url.assert_called_with(db='config')
 
         self.assertEqual(mock_base.metadata.bind, mock_create_engine.return_value)
