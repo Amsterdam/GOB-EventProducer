@@ -1,7 +1,7 @@
 from unittest import TestCase
 from unittest.mock import patch, MagicMock, call
 
-from gobkafkaproducer.producer import _to_bytes, KafkaEventProducer, LastSentEvent
+from gobkafkaproducer.producer import _to_bytes, KafkaEventProducer, LastSentEvent, EventDataBuilder
 
 
 class TestModuleFunctions(TestCase):
@@ -12,19 +12,169 @@ class TestModuleFunctions(TestCase):
         mock_bytes.assert_called_with('some string', encoding='utf-8')
 
 
+class TestEventDataBuilder(TestCase):
+
+    @patch("gobkafkaproducer.producer.split_relation_table_name")
+    @patch("gobkafkaproducer.producer.get_relations_for_collection")
+    @patch("gobkafkaproducer.producer.GOBModel")
+    def test_init(self, mock_model, mock_get_relations, mock_split_relation_table_name):
+        session = MagicMock()
+        base = MagicMock()
+        mock_model.return_value.get_table_name = lambda x, y: f"{x}_{y}"
+        mock_get_relations.return_value = {
+            'rel_a_attr': 'a',
+            'rel_b_attr': 'b',
+        }
+        mock_split_relation_table_name.side_effect = lambda x: {'dst_cat_abbr': 'dstcat', 'dst_col_abbr': x}
+        mock_model.return_value.get_reference_by_abbreviations = lambda x, y: y
+        mock_model.return_value.get_table_name_from_ref = lambda y: f'dst_table_{y}'
+        edb = EventDataBuilder(session, base, 'cat', 'coll')
+
+        self.assertEqual(session, edb.db_session)
+        self.assertEqual(base, edb.base)
+        self.assertEqual(mock_model.return_value.get_collection.return_value, edb.collection)
+        self.assertEqual('cat_coll', edb.tablename)
+
+        expected_relations = {
+            'rel_a_attr': {
+                'dst_table_name': 'dst_table_rel_a',
+                'relation_table_name': 'rel_a'
+            },
+            'rel_b_attr': {
+                'dst_table_name': 'dst_table_rel_b',
+                'relation_table_name': 'rel_b'
+            }
+        }
+        self.assertEqual(expected_relations, edb.relations)
+
+    def test_build_event(self):
+        class RelationObject:
+            # Create mock relation for DbObject
+            def __init__(self, id, begin_geldigheid, eind_geldigheid, dst_name, dst_has_states):
+                self.begin_geldigheid = begin_geldigheid
+                self.eind_geldigheid = eind_geldigheid
+
+                dst_fields = {
+                    '_id': id,
+                    '_tid': id
+                }
+                if dst_has_states:
+                    dst_fields['volgnummer'] = 1
+
+                self.__setattr__(dst_name, type("DstTable", (), dst_fields))
+
+        class DbObject:
+            id = 42
+            identificatie = 'identificatie'
+            ref_to_c = None
+            manyref_to_c = None
+            ref_to_d = None
+            manyref_to_d = None
+            rel_tst_rta_tst_rtc_ref_to_c_collection = [
+                RelationObject('id1', 'begingeldigheid', None, 'test_catalogue_rel_test_entity_c', True),
+                RelationObject('id2', 'begingeldigheid', 'eindgeldigheid', 'test_catalogue_rel_test_entity_c', True),
+            ]
+            rel_tst_rta_tst_rtc_manyref_to_c_collection = [
+                RelationObject('id3', 'begingeldigheid', None, 'test_catalogue_rel_test_entity_c', True),
+                RelationObject('id4', 'begingeldigheid', 'eindgeldigheid', 'test_catalogue_rel_test_entity_c', True),
+            ]
+            rel_tst_rta_tst_rtd_ref_to_d_collection = [
+                RelationObject('id5', 'begingeldigheid', None, 'test_catalogue_rel_test_entity_d', False),
+                RelationObject('id6', 'begingeldigheid', 'eindgeldigheid', 'test_catalogue_rel_test_entity_d', False),
+            ]
+            rel_tst_rta_tst_rtd_manyref_to_d_collection = [
+                RelationObject('id7', 'begingeldigheid', None, 'test_catalogue_rel_test_entity_d', False),
+                RelationObject('id8', 'begingeldigheid', 'eindgeldigheid', 'test_catalogue_rel_test_entity_d', False),
+            ]
+
+        edb = EventDataBuilder(MagicMock(), MagicMock(), 'test_catalogue', 'rel_test_entity_a')
+
+        edb.db_session.query.return_value.filter.return_value.one.return_value = DbObject()
+
+        expected = {
+            'id': '42',
+            'identificatie': 'identificatie',
+            'manyref_to_c': [
+                {
+                    'begin_geldigheid': 'begingeldigheid',
+                    'eind_geldigheid': None,
+                    'id': 'id3',
+                    'tid': 'id3',
+                    'volgnummer': 1
+                },
+                {
+                    'begin_geldigheid': 'begingeldigheid',
+                    'eind_geldigheid': 'eindgeldigheid',
+                    'id': 'id4',
+                    'tid': 'id4',
+                    'volgnummer': 1
+                }
+            ],
+            'manyref_to_d': [
+                {
+                    'begin_geldigheid': 'begingeldigheid',
+                    'eind_geldigheid': None,
+                    'id': 'id7',
+                    'tid': 'id7'
+                },
+                {
+                    'begin_geldigheid': 'begingeldigheid',
+                    'eind_geldigheid': 'eindgeldigheid',
+                    'id': 'id8',
+                    'tid': 'id8'
+                }
+            ],
+            'ref_to_c': [
+                {
+                    'begin_geldigheid': 'begingeldigheid',
+                    'eind_geldigheid': None,
+                    'id': 'id1',
+                    'tid': 'id1',
+                    'volgnummer': 1
+                },
+                {
+                    'begin_geldigheid': 'begingeldigheid',
+                    'eind_geldigheid': 'eindgeldigheid',
+                    'id': 'id2',
+                    'tid': 'id2',
+                    'volgnummer': 1
+                }
+            ],
+            'ref_to_d': [
+                {
+                    'begin_geldigheid': 'begingeldigheid',
+                    'eind_geldigheid': None,
+                    'id': 'id5',
+                    'tid': 'id5'
+                },
+                {
+                    'begin_geldigheid': 'begingeldigheid',
+                    'eind_geldigheid': 'eindgeldigheid',
+                    'id': 'id6',
+                    'tid': 'id6'
+                }
+            ]
+        }
+
+        self.assertEqual(expected, edb.build_event('the tid'))
+
+
 class TestKafkaEventProducerInitConnections(TestCase):
     """Tests constructor and init_connections. init_connections is fully mocked in other test class below.
     """
 
+    @patch("gobkafkaproducer.producer.EventDataBuilder")
     @patch("gobkafkaproducer.producer.KafkaEventProducer._init_connections")
-    def test_init(self, mock_init_connection):
+    def test_init(self, mock_init_connection, mock_databuilder):
         prod = KafkaEventProducer('CAT', 'COLL', 'LOGGER')
 
         self.assertEqual('CAT', prod.catalogue)
         self.assertEqual('COLL', prod.collection)
         self.assertEqual('LOGGER', prod.logger)
         mock_init_connection.assert_called_once()
+        mock_databuilder.assert_called_with(None, None, 'CAT', 'COLL')
 
+    @patch("gobkafkaproducer.producer.EventDataBuilder", MagicMock())
     @patch("gobkafkaproducer.producer.KafkaEventProducer._init_local_db_session")
     @patch("gobkafkaproducer.producer.KafkaEventProducer._init_gob_db_session")
     @patch("gobkafkaproducer.producer.KafkaEventProducer._init_kafka")
@@ -35,8 +185,33 @@ class TestKafkaEventProducerInitConnections(TestCase):
         mock_init_kafka.assert_called_once()
 
 
+class MockEventBuilder:
+    def __init__(self, *args):
+        pass
+
+    def build_event(self, tid):
+        return {'tid': tid, 'a': 'A', 'b': 'B'}
+
+
+@patch("gobkafkaproducer.producer.EventDataBuilder", MockEventBuilder)
 @patch("gobkafkaproducer.producer.KafkaEventProducer._init_connections", MagicMock())
 class TestKafkaEventProducerInit(TestCase):
+
+    @patch("gobkafkaproducer.producer.get_relations_for_collection")
+    def test_get_tables_to_reflect(self, mock_get_relations):
+        mock_get_relations.return_value = {'rel a': 'a', 'rel b': 'b'}
+        p = KafkaEventProducer('CAT', 'COL', MagicMock())
+        p.gobmodel = MagicMock()
+        p.gobmodel.get_table_name = lambda x, y: f"{x}_{y}".lower()
+
+        expected = [
+            'events',
+            'cat_col',
+            'rel_a',
+            'rel_b',
+        ]
+        self.assertEqual(expected, p._get_tables_to_reflect())
+        mock_get_relations.assert_called_with(p.gobmodel, 'CAT', 'COL')
 
     @patch("gobkafkaproducer.producer.MetaData")
     @patch("gobkafkaproducer.producer.create_engine")
@@ -45,8 +220,8 @@ class TestKafkaEventProducerInit(TestCase):
     @patch("gobkafkaproducer.producer.automap_base")
     @patch("gobkafkaproducer.producer.GOB_DATABASE_CONFIG", {'db': 'config'})
     def test_init_gob_db_session(self, mock_automap, mock_url, mock_session, mock_create_engine, mock_metadata):
-
         p = KafkaEventProducer('', '', MagicMock())
+        p._get_tables_to_reflect = MagicMock(return_value=['events', 'some_table'])
         p._init_gob_db_session()
 
         # Check initialisation of session
@@ -63,7 +238,7 @@ class TestKafkaEventProducerInit(TestCase):
         ])
         mock_metadata.assert_has_calls([
             call(),
-            call().reflect(mock_create_engine.return_value, only=['events'])
+            call().reflect(mock_create_engine.return_value, only=['events', 'some_table'])
         ])
 
     @patch("gobkafkaproducer.producer.Base")
@@ -72,7 +247,6 @@ class TestKafkaEventProducerInit(TestCase):
     @patch("gobkafkaproducer.producer.URL")
     @patch("gobkafkaproducer.producer.DATABASE_CONFIG", {'db': 'config'})
     def test_init_local_db_session(self, mock_url, mock_session, mock_create_engine, mock_base):
-
         p = KafkaEventProducer('', '', MagicMock())
         p._init_local_db_session()
 
@@ -142,13 +316,15 @@ class TestKafkaEventProducerInit(TestCase):
 
     @patch("gobkafkaproducer.producer.and_")
     def test_get_events(self, mock_and):
-
         class MockComp:
             asc = MagicMock()
+
             def __init__(self, name):
                 self.name = name
+
             def __eq__(self, other):
                 return f"{self.name} == {other}"
+
             def __gt__(self, other):
                 return f"{self.name} > {other}"
 
@@ -180,18 +356,16 @@ class TestKafkaEventProducerInit(TestCase):
     @patch("gobkafkaproducer.producer.KAFKA_TOPIC", "KAFKA_TOPIC")
     def test_add_event(self):
         event = MagicMock()
-        event.name = 'NAME'
-        event.id = 'ID'
+        event.action = 'ACTION'
+        event.eventid = 'ID'
         event.data = {
-            '_entity_source_id': 'ENT SOURCE ID',
-            '_source_id': 'SOURCE ID',
             'some': 'data',
             'int': 8042,
         }
         event.last_event = 15480
         event.catalogue = 'CAT'
         event.entity = 'COLL'
-        event.source = 'SOURCE'
+        event.tid = 'TID'
 
         p = KafkaEventProducer('cat', 'coll', MagicMock())
         p.producer = MagicMock()
@@ -199,35 +373,14 @@ class TestKafkaEventProducerInit(TestCase):
         p._add_event(event)
         p.producer.send.assert_called_with(
             'KAFKA_TOPIC',
-            key=b'ENT SOURCE ID',
-            value=b'{"_entity_source_id": "ENT SOURCE ID", "_source_id": "SOURCE ID", "some": "data", "int": 8042}',
+            key=b'TID',
+            value=b'{"tid": "TID", "a": "A", "b": "B"}',
             headers=[
-                ('event_type', b'NAME'),
+                ('event_type', b'ACTION'),
                 ('event_id', b'ID'),
-                ('source_id', b'ENT SOURCE ID'),
-                ('last_event', b'15480'),
+                ('tid', b'TID'),
                 ('catalog', b'CAT'),
                 ('collection', b'COLL'),
-                ('source', b'SOURCE'),
-            ]
-        )
-
-        # Test without _entity_source_id. Source ID should fall back to _source_id
-        del event.data['_entity_source_id']
-        p._add_event(event)
-
-        p.producer.send.assert_called_with(
-            'KAFKA_TOPIC',
-            key=b'SOURCE ID',
-            value=b'{"_source_id": "SOURCE ID", "some": "data", "int": 8042}',
-            headers=[
-                ('event_type', b'NAME'),
-                ('event_id', b'ID'),
-                ('source_id', b'SOURCE ID'),
-                ('last_event', b'15480'),
-                ('catalog', b'CAT'),
-                ('collection', b'COLL'),
-                ('source', b'SOURCE'),
             ]
         )
 
@@ -241,22 +394,23 @@ class TestKafkaEventProducerInit(TestCase):
         p.producer.flush.assert_called_with(timeout=120)
         p._set_last_eventid.assert_called_with(2480)
 
-    @patch("gobkafkaproducer.producer.database_to_gobevent")
-    def test_produce(self, mock_db_to_gobevent):
+    def test_produce(self):
         class MockEvent:
             def __init__(self, id):
-                self.id = id
+                self.eventid = id
+
+            def __eq__(self, other):
+                return self.eventid == other.eventid
 
         event_cnt = 5
 
         p = KafkaEventProducer('', '', MagicMock())
         p._get_last_eventid = MagicMock(return_value=240)
-        p._get_events = MagicMock(return_value=[i for i in range(event_cnt)])
+        p._get_events = MagicMock(return_value=[MockEvent(i) for i in range(event_cnt)])
         p._add_event = MagicMock()
         p._flush = MagicMock()
         p.gob_db_session = MagicMock()
         p.FLUSH_PER = 2
-        mock_db_to_gobevent.side_effect = lambda i: MockEvent(i)
 
         p.produce()
 
@@ -268,11 +422,11 @@ class TestKafkaEventProducerInit(TestCase):
             call(4),
         ])
         p.gob_db_session.expunge.assert_has_calls([
-            call(0),
-            call(1),
-            call(2),
-            call(3),
-            call(4),
+            call(MockEvent(0)),
+            call(MockEvent(1)),
+            call(MockEvent(2)),
+            call(MockEvent(3)),
+            call(MockEvent(4)),
         ])
 
         # Test last flush 0
