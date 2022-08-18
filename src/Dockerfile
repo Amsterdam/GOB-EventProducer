@@ -30,3 +30,21 @@ COPY alembic alembic
 COPY alembic.ini alembic.ini
 
 CMD ["python", "-m", "gobkafkaproducer"]
+
+
+# Test.
+FROM application as test
+USER root
+# Remove gobcore/gobconfig tests (if present).
+RUN rm -rf /app/src/gobcore/tests
+RUN rm -rf /app/src/gobconfig/tests
+
+# Copy tests.
+COPY tests tests
+COPY .flake8 .flake8
+COPY test.sh test.sh
+
+# Copy Jenkins files.
+COPY .jenkins /.jenkins
+
+USER datapunt
