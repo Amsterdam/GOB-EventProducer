@@ -1,4 +1,4 @@
-alembic==1.6.5
--e git+https://github.com/Amsterdam/GOB-Config.git@v0.4.14v#egg=gobconfig
--e git+https://github.com/Amsterdam/GOB-Core.git@v0.17.12u#egg=gobcore
+alembic==1.8.1
+-e git+https://github.com/Amsterdam/GOB-Config.git@v0.6.0#egg=gobconfig
+-e git+https://github.com/Amsterdam/GOB-Core.git@v1.5.2#egg=gobcore
 kafka-python==2.0.2
