@@ -101,7 +101,7 @@ class TestStorage(TestCase):
         gobkafkaproducer.database.connection.engine = MockedEngine()
         gobkafkaproducer.database.connection.session = MockedSession()
 
-    @mock.patch("gobkafkaproducer.database.connection.URL")
+    @mock.patch("gobkafkaproducer.database.connection.URL.create")
     @mock.patch("gobkafkaproducer.database.connection.migrate_storage")
     @mock.patch("gobkafkaproducer.database.connection.create_engine")
     def test_connect(self, mock_create, mock_migrate, mock_url):

@@ -47,7 +47,7 @@ docker compose -f src/.jenkins/test/docker-compose.yml run --rm test
 
 ## Requirements
 
-* Python >= 3.6
+* Python >= 3.9
 
 ## Initialisation
 
