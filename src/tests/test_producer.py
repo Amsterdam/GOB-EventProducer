@@ -14,25 +14,37 @@ class TestModuleFunctions(TestCase):
 
 class TestEventDataBuilder(TestCase):
 
+    mock_gobmodel_data = {
+            'cat': {
+                'collections': {
+                    'coll': {
+                        'attributes': {}
+                    }
+                }
+            }
+        }
+
     @patch("gobkafkaproducer.producer.split_relation_table_name")
     @patch("gobkafkaproducer.producer.get_relations_for_collection")
-    @patch("gobkafkaproducer.producer.GOBModel")
+    @patch("gobkafkaproducer.producer.gob_model", spec_set=True)
     def test_init(self, mock_model, mock_get_relations, mock_split_relation_table_name):
         session = MagicMock()
         base = MagicMock()
-        mock_model.return_value.get_table_name = lambda x, y: f"{x}_{y}"
+        mock_model.__getitem__.return_value = self.mock_gobmodel_data['cat']
+        mock_model.get_table_name = lambda x, y: f"{x}_{y}"
         mock_get_relations.return_value = {
             'rel_a_attr': 'a',
             'rel_b_attr': 'b',
         }
-        mock_split_relation_table_name.side_effect = lambda x: {'dst_cat_abbr': 'dstcat', 'dst_col_abbr': x}
-        mock_model.return_value.get_reference_by_abbreviations = lambda x, y: y
-        mock_model.return_value.get_table_name_from_ref = lambda y: f'dst_table_{y}'
+        mock_split_relation_table_name.side_effect = lambda x: {
+            'dst_cat_abbr': 'dstcat', 'dst_col_abbr': x}
+        mock_model.get_reference_by_abbreviations = lambda x, y: y
+        mock_model.get_table_name_from_ref = lambda y: f'dst_table_{y}'
         edb = EventDataBuilder(session, base, 'cat', 'coll')
 
         self.assertEqual(session, edb.db_session)
         self.assertEqual(base, edb.base)
-        self.assertEqual(mock_model.return_value.get_collection.return_value, edb.collection)
+        self.assertEqual(self.mock_gobmodel_data['cat']['collections']['coll'], edb.collection)
         self.assertEqual('cat_coll', edb.tablename)
 
         expected_relations = {
@@ -198,11 +210,11 @@ class MockEventBuilder:
 class TestKafkaEventProducerInit(TestCase):
 
     @patch("gobkafkaproducer.producer.get_relations_for_collection")
-    def test_get_tables_to_reflect(self, mock_get_relations):
+    @patch("gobkafkaproducer.producer.gob_model", spec_set=True)
+    def test_get_tables_to_reflect(self, mock_model, mock_get_relations):
         mock_get_relations.return_value = {'rel a': 'a', 'rel b': 'b'}
         p = KafkaEventProducer('CAT', 'COL', MagicMock())
-        p.gobmodel = MagicMock()
-        p.gobmodel.get_table_name = lambda x, y: f"{x}_{y}".lower()
+        mock_model.get_table_name = lambda x, y: f"{x}_{y}".lower()
 
         expected = [
             'events',
@@ -211,7 +223,7 @@ class TestKafkaEventProducerInit(TestCase):
             'rel_b',
         ]
         self.assertEqual(expected, p._get_tables_to_reflect())
-        mock_get_relations.assert_called_with(p.gobmodel, 'CAT', 'COL')
+        mock_get_relations.assert_called_with(mock_model, 'CAT', 'COL')
 
     @patch("gobkafkaproducer.producer.MetaData")
     @patch("gobkafkaproducer.producer.create_engine")

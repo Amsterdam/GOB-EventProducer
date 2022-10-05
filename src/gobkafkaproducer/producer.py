@@ -1,14 +1,17 @@
 import json
 import logging
-from gobcore.model import GOBModel
-from gobcore.model.relations import get_relations_for_collection, split_relation_table_name
-from gobcore.typesystem import get_gob_type_from_info
+
 from kafka.producer import KafkaProducer
+
 from sqlalchemy import MetaData, and_, create_engine
 from sqlalchemy.engine.url import URL
 from sqlalchemy.ext.automap import automap_base
 from sqlalchemy.orm import Session
 
+from gobcore.model.relations import get_relations_for_collection, split_relation_table_name
+from gobcore.typesystem import get_gob_type_from_info
+
+from gobkafkaproducer import gob_model
 from gobkafkaproducer.config import DATABASE_CONFIG, GOB_DATABASE_CONFIG, KAFKA_CONNECTION_CONFIG, KAFKA_TOPIC
 from gobkafkaproducer.database.model import Base, LastSentEvent
 
@@ -20,26 +23,23 @@ def _to_bytes(s: str):
 
 
 class EventDataBuilder:
-    gobmodel = None
 
-    def __init__(self, gob_db_session, gob_db_base, catalogue: str, collection: str):
-        if self.gobmodel is None:
-            self.gobmodel = GOBModel()
-
+    def __init__(self, gob_db_session, gob_db_base, catalogue: str, collection_name: str):
         self.db_session = gob_db_session
         self.base = gob_db_base
 
-        self.collection = self.gobmodel.get_collection(catalogue, collection)
-        self.tablename = self.gobmodel.get_table_name(catalogue, collection)
-        self.basetable = getattr(self.base.classes, self.gobmodel.get_table_name(catalogue, collection))
+        self.collection = gob_model[catalogue]['collections'][collection_name]
+        self.tablename = gob_model.get_table_name(catalogue, collection_name)
+        self.basetable = getattr(self.base.classes, self.tablename)
 
-        self._init_relations(catalogue, collection)
+        self._init_relations(catalogue, collection_name)
 
-    def _init_relations(self, catalogue: str, collection: str):
+    def _init_relations(self, catalogue: str, collection_name: str):
         self.relations = {}
 
-        for attr_name, relname in get_relations_for_collection(self.gobmodel, catalogue, collection).items():
-            rel_table_name = self.gobmodel.get_table_name('rel', relname)
+        for attr_name, relname in get_relations_for_collection(
+                gob_model, catalogue, collection_name).items():
+            rel_table_name = gob_model.get_table_name('rel', relname)
             self.relations[attr_name] = {
                 'relation_table_name': rel_table_name,
                 'dst_table_name': self._get_rel_dst_tablename(rel_table_name),
@@ -47,8 +47,8 @@ class EventDataBuilder:
 
     def _get_rel_dst_tablename(self, rel_table_name: str):
         info = split_relation_table_name(rel_table_name)
-        reference = self.gobmodel.get_reference_by_abbreviations(info['dst_cat_abbr'], info['dst_col_abbr'])
-        return self.gobmodel.get_table_name_from_ref(reference)
+        reference = gob_model.get_reference_by_abbreviations(info['dst_cat_abbr'], info['dst_col_abbr'])
+        return gob_model.get_table_name_from_ref(reference)
 
     def build_event(self, tid: str) -> dict:
         query = self.db_session.query(self.basetable).filter(self.basetable._tid == tid)
@@ -75,19 +75,18 @@ class EventDataBuilder:
 
                 result[attr_name] = relation_obj
             else:
-                type = get_gob_type_from_info(attr)
-                type_instance = type.from_value(getattr(obj, attr_name))
+                gob_type = get_gob_type_from_info(attr)
+                type_instance = gob_type.from_value(getattr(obj, attr_name))
                 result[attr_name] = str(type_instance.to_value)
         return result
 
 
 class KafkaEventProducer:
     FLUSH_PER = 10000
-    gobmodel = GOBModel()
 
-    def __init__(self, catalogue: str, collection: str, logger):
+    def __init__(self, catalogue: str, collection_name: str, logger):
         self.catalogue = catalogue
-        self.collection = collection
+        self.collection = collection_name
         self.logger = logger
         self.gob_db_session = None
         self.db_session = None
@@ -98,7 +97,8 @@ class KafkaEventProducer:
 
         self._init_connections()
 
-        self.event_builder = EventDataBuilder(self.gob_db_session, self.gob_db_base, catalogue, collection)
+        self.event_builder = EventDataBuilder(
+            self.gob_db_session, self.gob_db_base, catalogue, collection_name)
 
     def _get_tables_to_reflect(self):
         """Returns tables to reflect:
@@ -108,12 +108,12 @@ class KafkaEventProducer:
 
         :return:
         """
-        relations = get_relations_for_collection(self.gobmodel, self.catalogue, self.collection)
-        relation_tables = [self.gobmodel.get_table_name('rel', rel_table) for rel_table in relations.values()]
+        relations = get_relations_for_collection(gob_model, self.catalogue, self.collection)
+        relation_tables = [gob_model.get_table_name('rel', rel_table) for rel_table in relations.values()]
 
         return [
                    'events',
-                   self.gobmodel.get_table_name(self.catalogue, self.collection)
+                   gob_model.get_table_name(self.catalogue, self.collection)
                ] + relation_tables
 
     def _init_gob_db_session(self):
@@ -142,10 +142,11 @@ class KafkaEventProducer:
         self.db_session = Session(engine)
 
     def _init_kafka(self):
-        self.producer = KafkaProducer(**KAFKA_CONNECTION_CONFIG,
-                                      max_in_flight_requests_per_connection=1,
-                                      # With retries, max_in_flight should always be 1 to ensure ordering of batches!
-                                      retries=3)
+        self.producer = KafkaProducer(
+            **KAFKA_CONNECTION_CONFIG,
+            max_in_flight_requests_per_connection=1,
+            # With retries, max_in_flight should always be 1 to ensure ordering of batches!
+            retries=3)
         self.logger.info("Initialised Kafka connection")
 
     def _init_connections(self):
@@ -171,7 +172,8 @@ class KafkaEventProducer:
         if last_event:
             last_event.last_event = eventid
         else:
-            last_event = LastSentEvent(catalogue=self.catalogue, collection=self.collection, last_event=eventid)
+            last_event = LastSentEvent(
+                catalogue=self.catalogue, collection=self.collection, last_event=eventid)
             self.db_session.add(last_event)
 
         self.db_session.commit()
@@ -180,7 +182,8 @@ class KafkaEventProducer:
         return self.gob_db_session \
             .query(self.Event) \
             .yield_per(10000) \
-            .filter(and_(self.Event.catalogue == self.catalogue, self.Event.entity == self.collection,
+            .filter(and_(self.Event.catalogue == self.catalogue,
+                         self.Event.entity == self.collection,
                          self.Event.eventid > min_eventid)) \
             .order_by(self.Event.eventid.asc())
 
