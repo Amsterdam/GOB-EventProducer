@@ -9,8 +9,8 @@ from logging.config import fileConfig
 
 
 sys.path.append('.')
-from gobkafkaproducer.database.model import Base
-from gobkafkaproducer.config import DATABASE_CONFIG
+from gobeventproducer.database.model import Base
+from gobeventproducer.config import DATABASE_CONFIG
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.

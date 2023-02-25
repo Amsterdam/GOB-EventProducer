@@ -1,7 +1,30 @@
 from unittest import TestCase
 from unittest.mock import patch, MagicMock, call
 
-from gobkafkaproducer.producer import _to_bytes, KafkaEventProducer, LastSentEvent, EventDataBuilder
+from gobeventproducer.producer import _to_bytes, EventProducer, LastSentEvent, EventDataBuilder, LocalDatabaseConnection
+
+class AsyncConnectionMock:
+    def __init__(self, connection_params: dict):
+        self.connection_params = connection_params
+        self.published = []
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        pass
+
+    def publish(self, exchange: str, routing_key: str, msg: dict):
+        self.published.append((exchange, routing_key, msg))
+
+    def assert_message_published(self, exchange: str, routing_key: str, msg: dict):
+        assert (exchange, routing_key, msg) in self.published
+
+    def assert_publish_count(self, n: int):
+        assert len(self.published) == n
+
+    def assert_connected_with(self, connection_params: str):
+        assert self.connection_params == connection_params
 
 
 class TestModuleFunctions(TestCase):
@@ -24,9 +47,9 @@ class TestEventDataBuilder(TestCase):
             }
         }
 
-    @patch("gobkafkaproducer.producer.split_relation_table_name")
-    @patch("gobkafkaproducer.producer.get_relations_for_collection")
-    @patch("gobkafkaproducer.producer.gob_model", spec_set=True)
+    @patch("gobeventproducer.producer.split_relation_table_name")
+    @patch("gobeventproducer.producer.get_relations_for_collection")
+    @patch("gobeventproducer.producer.gob_model", spec_set=True)
     def test_init(self, mock_model, mock_get_relations, mock_split_relation_table_name):
         session = MagicMock()
         base = MagicMock()
@@ -171,14 +194,14 @@ class TestEventDataBuilder(TestCase):
         self.assertEqual(expected, edb.build_event('the tid'))
 
 
-class TestKafkaEventProducerInitConnections(TestCase):
+class TestEventProducerInitConnections(TestCase):
     """Tests constructor and init_connections. init_connections is fully mocked in other test class below.
     """
 
-    @patch("gobkafkaproducer.producer.EventDataBuilder")
-    @patch("gobkafkaproducer.producer.KafkaEventProducer._init_connections")
+    @patch("gobeventproducer.producer.EventDataBuilder")
+    @patch("gobeventproducer.producer.EventProducer._init_gob_db_session")
     def test_init(self, mock_init_connection, mock_databuilder):
-        prod = KafkaEventProducer('CAT', 'COLL', 'LOGGER')
+        prod = EventProducer('CAT', 'COLL', 'LOGGER')
 
         self.assertEqual('CAT', prod.catalogue)
         self.assertEqual('COLL', prod.collection)
@@ -186,55 +209,17 @@ class TestKafkaEventProducerInitConnections(TestCase):
         mock_init_connection.assert_called_once()
         mock_databuilder.assert_called_with(None, None, 'CAT', 'COLL')
 
-    @patch("gobkafkaproducer.producer.EventDataBuilder", MagicMock())
-    @patch("gobkafkaproducer.producer.KafkaEventProducer._init_local_db_session")
-    @patch("gobkafkaproducer.producer.KafkaEventProducer._init_gob_db_session")
-    @patch("gobkafkaproducer.producer.KafkaEventProducer._init_kafka")
-    def test_init_connections(self, mock_init_kafka, mock_init_gob_db, mock_init_local_db):
-        KafkaEventProducer('', '', '')
-        mock_init_local_db.assert_called_once()
-        mock_init_gob_db.assert_called_once()
-        mock_init_kafka.assert_called_once()
-
-
-class MockEventBuilder:
-    def __init__(self, *args):
-        pass
-
-    def build_event(self, tid):
-        return {'tid': tid, 'a': 'A', 'b': 'B'}
-
-
-@patch("gobkafkaproducer.producer.EventDataBuilder", MockEventBuilder)
-@patch("gobkafkaproducer.producer.KafkaEventProducer._init_connections", MagicMock())
-class TestKafkaEventProducerInit(TestCase):
-
-    @patch("gobkafkaproducer.producer.get_relations_for_collection")
-    @patch("gobkafkaproducer.producer.gob_model", spec_set=True)
-    def test_get_tables_to_reflect(self, mock_model, mock_get_relations):
-        mock_get_relations.return_value = {'rel a': 'a', 'rel b': 'b'}
-        p = KafkaEventProducer('CAT', 'COL', MagicMock())
-        mock_model.get_table_name = lambda x, y: f"{x}_{y}".lower()
-
-        expected = [
-            'events',
-            'cat_col',
-            'rel_a',
-            'rel_b',
-        ]
-        self.assertEqual(expected, p._get_tables_to_reflect())
-        mock_get_relations.assert_called_with(mock_model, 'CAT', 'COL')
-
-    @patch("gobkafkaproducer.producer.MetaData")
-    @patch("gobkafkaproducer.producer.create_engine")
-    @patch("gobkafkaproducer.producer.Session")
-    @patch("gobkafkaproducer.producer.URL")
-    @patch("gobkafkaproducer.producer.automap_base")
-    @patch("gobkafkaproducer.producer.GOB_DATABASE_CONFIG", {'db': 'config'})
-    def test_init_gob_db_session(self, mock_automap, mock_url, mock_session, mock_create_engine, mock_metadata):
-        p = KafkaEventProducer('', '', MagicMock())
-        p._get_tables_to_reflect = MagicMock(return_value=['events', 'some_table'])
-        p._init_gob_db_session()
+    @patch("gobeventproducer.producer.EventDataBuilder")
+    @patch("gobeventproducer.producer.EventProducer._get_tables_to_reflect")
+    @patch("gobeventproducer.producer.MetaData")
+    @patch("gobeventproducer.producer.create_engine")
+    @patch("gobeventproducer.producer.Session")
+    @patch("gobeventproducer.producer.URL")
+    @patch("gobeventproducer.producer.automap_base")
+    @patch("gobeventproducer.producer.GOB_DATABASE_CONFIG", {'db': 'config'})
+    def test_init_gob_db_session(self, mock_automap, mock_url, mock_session, mock_create_engine, mock_metadata, mock_get_tables, mock_databuilder):
+        mock_get_tables.return_value = ['events', 'some_table']
+        p = EventProducer('', '', MagicMock())
 
         # Check initialisation of session
         self.assertEqual(mock_session.return_value, p.gob_db_session)
@@ -253,80 +238,117 @@ class TestKafkaEventProducerInit(TestCase):
             call().reflect(mock_create_engine.return_value, only=['events', 'some_table'])
         ])
 
-    @patch("gobkafkaproducer.producer.Base")
-    @patch("gobkafkaproducer.producer.create_engine")
-    @patch("gobkafkaproducer.producer.Session")
-    @patch("gobkafkaproducer.producer.URL")
-    @patch("gobkafkaproducer.producer.DATABASE_CONFIG", {'db': 'config'})
+
+class MockEventBuilder:
+    def __init__(self, *args):
+        pass
+
+    def build_event(self, tid):
+        return {'tid': tid, 'a': 'A', 'b': 'B'}
+
+class TestLocalDatabaseConnection(TestCase):
+    @patch("gobeventproducer.producer.Base")
+    @patch("gobeventproducer.producer.create_engine")
+    @patch("gobeventproducer.producer.Session")
+    @patch("gobeventproducer.producer.URL")
+    @patch("gobeventproducer.producer.DATABASE_CONFIG", {'db': 'config'})
     def test_init_local_db_session(self, mock_url, mock_session, mock_create_engine, mock_base):
-        p = KafkaEventProducer('', '', MagicMock())
-        p._init_local_db_session()
+        inst = LocalDatabaseConnection('', '')
+        inst._connect()
 
         # Check initialisation of session
-        self.assertEqual(mock_session.return_value, p.db_session)
+        self.assertEqual(mock_session.return_value, inst.session)
         mock_session.assert_called_with(mock_create_engine.return_value)
         mock_create_engine.assert_called_with(mock_url.return_value, connect_args={'sslmode': 'require'})
         mock_url.assert_called_with(db='config')
 
         self.assertEqual(mock_base.metadata.bind, mock_create_engine.return_value)
 
-    @patch("gobkafkaproducer.producer.KAFKA_CONNECTION_CONFIG", {'kafka': 'config'})
-    @patch("gobkafkaproducer.producer.KafkaProducer")
-    def test_init_kafka(self, mock_kafka_producer):
-        p = KafkaEventProducer('', '', MagicMock())
-        p._init_kafka()
+    def test_context_manager(self):
+        inst = LocalDatabaseConnection('', '')
+        inst._connect = MagicMock()
+        inst.session = MagicMock()
 
-        self.assertEqual(mock_kafka_producer.return_value, p.producer)
-        mock_kafka_producer.assert_called_with(kafka='config',
-                                               max_in_flight_requests_per_connection=1,
-                                               retries=3)
+        with inst as tst:
+            self.assertEqual(tst, inst)
+
+            inst._connect.assert_called_once()
+        inst.session.commit.assert_called_once()
 
     def test_get_last_event(self):
-        p = KafkaEventProducer('cat', 'coll', MagicMock())
-        p.db_session = MagicMock()
+        inst = LocalDatabaseConnection('cat', 'coll')
+        inst.session = MagicMock()
 
-        result = p._get_last_event()
-        p.db_session.query.assert_has_calls([
+        # 1. Already set
+        mock_last_event = MagicMock()
+        inst.last_event = mock_last_event
+        self.assertEqual(inst.get_last_event(), mock_last_event)
+
+        # 2. Query database, return result
+        inst.last_event = None
+        database_result = MagicMock()
+        inst.session.query.return_value.filter_by.return_value.first.return_value = database_result
+        result = inst.get_last_event()
+
+        inst.session.query.assert_has_calls([
             call(LastSentEvent),
             call().filter_by(catalogue='cat', collection='coll'),
             call().filter_by().first(),
         ])
-        self.assertEqual(p.db_session.query().filter_by().first(), result)
+        self.assertEqual(result, database_result)
+        self.assertEqual(inst.last_event, database_result)
+
+        # 3. Query database, no result, create new one
+        inst.last_event = None
+        inst.session.query.return_value.filter_by.return_value.first.return_value = None
+
+        with patch("gobeventproducer.producer.LastSentEvent") as mock_last_sent_event:
+            result = inst.get_last_event()
+            inst.session.add.assert_called_with(mock_last_sent_event.return_value)
+            mock_last_sent_event.assert_called_with(catalogue='cat', collection='coll', last_event=-1)
+
+            self.assertEqual(inst.last_event, mock_last_sent_event.return_value)
+            self.assertEqual(result, mock_last_sent_event.return_value)
 
     def test_get_last_eventid(self):
-        p = KafkaEventProducer('', '', MagicMock())
-        p._get_last_event = MagicMock()
+        inst = LocalDatabaseConnection('', '')
+        inst.get_last_event = MagicMock()
+        inst.get_last_event.return_value.last_event = 1480
 
-        self.assertEqual(p._get_last_event.return_value.last_event, p._get_last_eventid())
-
-        p._get_last_event.return_value = None
-        self.assertEqual(-1, p._get_last_eventid())
+        self.assertEqual(1480, inst.get_last_eventid())
+        self.assertEqual(inst.get_last_event.return_value.last_event, inst.get_last_eventid())
 
     def test_set_last_eventid(self):
-        p = KafkaEventProducer('cat', 'coll', MagicMock())
-        p.db_session = MagicMock()
+        inst = LocalDatabaseConnection('', '')
+        inst.last_event = MagicMock()
+        inst.last_event.last_event = 48
 
-        # 1. Test existing
-        last = LastSentEvent(catalogue='cat', collection='col', last_event=1)
-        p._get_last_event = MagicMock(return_value=last)
+        inst.set_last_eventid(20)
+        self.assertEqual(inst.last_event.last_event, 20)
 
-        p._set_last_eventid(5)
 
-        p.db_session.add.assert_not_called()
-        p.db_session.commit.assert_called_once()
-        self.assertEqual(5, last.last_event)
+@patch("gobeventproducer.producer.EventDataBuilder", MockEventBuilder)
+@patch("gobeventproducer.producer.EventProducer._init_gob_db_session", MagicMock())
+class TestEventProducerInit(TestCase):
 
-        # 2. Test new
-        with patch("gobkafkaproducer.producer.LastSentEvent") as mock_last_sent_event:
-            p.db_session.commit.reset_mock()
+    @patch("gobeventproducer.producer.get_relations_for_collection")
+    @patch("gobeventproducer.producer.gob_model", spec_set=True)
+    def test_get_tables_to_reflect(self, mock_model, mock_get_relations):
+        mock_get_relations.return_value = {'rel a': 'a', 'rel b': 'b'}
+        p = EventProducer('CAT', 'COL', MagicMock())
+        mock_model.get_table_name = lambda x, y: f"{x}_{y}".lower()
 
-            p._get_last_event.return_value = None
-            p._set_last_eventid(10)
-            p.db_session.add.assert_called_with(mock_last_sent_event.return_value)
-            mock_last_sent_event.assert_called_with(catalogue='cat', collection='coll', last_event=10)
-            p.db_session.commit.assert_called_once()
+        expected = [
+            'events',
+            'cat_col',
+            'rel_a',
+            'rel_b',
+        ]
+        self.assertEqual(expected, p._get_tables_to_reflect())
+        mock_get_relations.assert_called_with(mock_model, 'CAT', 'COL')
 
-    @patch("gobkafkaproducer.producer.and_")
+
+    @patch("gobeventproducer.producer.and_")
     def test_get_events(self, mock_and):
         class MockComp:
             asc = MagicMock()
@@ -340,7 +362,10 @@ class TestKafkaEventProducerInit(TestCase):
             def __gt__(self, other):
                 return f"{self.name} > {other}"
 
-        p = KafkaEventProducer('cat', 'coll', MagicMock())
+            def __le__(self, other):
+                return f"{self.name} <= {other}"
+
+        p = EventProducer('cat', 'coll', MagicMock())
         p.Event = MagicMock()
         p.Event.catalogue = MockComp("catalogue")
         p.Event.entity = MockComp("entity")
@@ -348,7 +373,7 @@ class TestKafkaEventProducerInit(TestCase):
 
         p.gob_db_session = MagicMock()
 
-        res = p._get_events(184)
+        res = p._get_events(184, 200)
 
         p.gob_db_session.query.assert_has_calls([
             call(p.Event),
@@ -362,10 +387,10 @@ class TestKafkaEventProducerInit(TestCase):
         mock_and.assert_called_with(
             'catalogue == cat',
             'entity == coll',
-            'eventid > 184'
+            'eventid > 184',
+            'eventid <= 200',
         )
 
-    @patch("gobkafkaproducer.producer.KAFKA_TOPIC", "KAFKA_TOPIC")
     def test_add_event(self):
         event = MagicMock()
         event.action = 'ACTION'
@@ -379,34 +404,34 @@ class TestKafkaEventProducerInit(TestCase):
         event.entity = 'COLL'
         event.tid = 'TID'
 
-        p = KafkaEventProducer('cat', 'coll', MagicMock())
+        p = EventProducer('cat', 'coll', MagicMock())
         p.producer = MagicMock()
 
-        p._add_event(event)
-        p.producer.send.assert_called_with(
-            'KAFKA_TOPIC',
-            key=b'TID',
-            value=b'{"tid": "TID", "a": "A", "b": "B"}',
-            headers=[
-                ('event_type', b'ACTION'),
-                ('event_id', b'ID'),
-                ('tid', b'TID'),
-                ('catalog', b'CAT'),
-                ('collection', b'COLL'),
-            ]
+        connection = MagicMock()
+
+        p._add_event(event, connection)
+        connection.publish.assert_called_with(
+            "gob.events",
+            "cat.coll",
+            {
+                'header': {
+                    'event_type': 'ACTION',
+                    'event_id': 'ID',
+                    'tid': 'TID',
+                    'catalog': 'CAT',
+                    'collection': 'COLL',
+                },
+                'data': {
+                    'tid': 'TID',
+                    'a': 'A',
+                    'b': 'B',
+                }
+            }
         )
 
-    @patch("builtins.print", MagicMock())
-    def test_flush(self):
-        p = KafkaEventProducer('', '', '')
-        p._set_last_eventid = MagicMock()
-        p.producer = MagicMock()
-
-        p._flush(2480)
-        p.producer.flush.assert_called_with(timeout=120)
-        p._set_last_eventid.assert_called_with(2480)
-
-    def test_produce(self):
+    @patch("gobeventproducer.producer.LocalDatabaseConnection")
+    @patch("gobeventproducer.producer.AsyncConnection", AsyncConnectionMock)
+    def test_produce(self, mock_localdb):
         class MockEvent:
             def __init__(self, id):
                 self.eventid = id
@@ -414,25 +439,19 @@ class TestKafkaEventProducerInit(TestCase):
             def __eq__(self, other):
                 return self.eventid == other.eventid
 
+        localdb_instance = mock_localdb.return_value.__enter__.return_value
         event_cnt = 5
 
-        p = KafkaEventProducer('', '', MagicMock())
-        p._get_last_eventid = MagicMock(return_value=240)
+        p = EventProducer('', '', MagicMock())
         p._get_events = MagicMock(return_value=[MockEvent(i) for i in range(event_cnt)])
         p._add_event = MagicMock()
-        p._flush = MagicMock()
         p.gob_db_session = MagicMock()
-        p.FLUSH_PER = 2
+        localdb_instance.get_last_eventid = MagicMock(return_value=100)
 
-        p.produce()
+        p.produce(100, 200)
 
-        p._get_events.assert_called_with(240)
+        p._get_events.assert_called_with(100, 200)
         self.assertEqual(event_cnt, p._add_event.call_count)
-        p._flush.assert_has_calls([
-            call(1),
-            call(3),
-            call(4),
-        ])
         p.gob_db_session.expunge.assert_has_calls([
             call(MockEvent(0)),
             call(MockEvent(1)),
@@ -440,12 +459,16 @@ class TestKafkaEventProducerInit(TestCase):
             call(MockEvent(3)),
             call(MockEvent(4)),
         ])
-
-        # Test last flush 0
-        p.FLUSH_PER = event_cnt
-        p._flush.reset_mock()
-        p.produce()
-        p._flush.assert_has_calls([
+        localdb_instance.set_last_eventid.assert_has_calls([
+            call(0),
+            call(1),
+            call(2),
+            call(3),
             call(4),
-            call(4),  # Last flush happens with the same argument because nothing was added between flushes. That's ok.
         ])
+        p.logger.warning.assert_not_called()
+
+
+        # min_eventid does not match start_event
+        p.produce(110, 200)
+        p.logger.warning.assert_called_with("Min eventid (110) to produce does not match last_eventid (100) in database. Recovering.")

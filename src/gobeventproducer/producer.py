@@ -1,7 +1,4 @@
-import json
 import logging
-
-from kafka.producer import KafkaProducer
 
 from sqlalchemy import MetaData, and_, create_engine
 from sqlalchemy.engine.url import URL
@@ -10,12 +7,14 @@ from sqlalchemy.orm import Session
 
 from gobcore.model.relations import get_relations_for_collection, split_relation_table_name
 from gobcore.typesystem import get_gob_type_from_info
+from gobcore.message_broker.config import CONNECTION_PARAMS, EVENTS_EXCHANGE
+from gobcore.message_broker.async_message_broker import AsyncConnection
 
-from gobkafkaproducer import gob_model
-from gobkafkaproducer.config import DATABASE_CONFIG, GOB_DATABASE_CONFIG, KAFKA_CONNECTION_CONFIG, KAFKA_TOPIC
-from gobkafkaproducer.database.model import Base, LastSentEvent
+from gobeventproducer import gob_model
+from gobeventproducer.config import DATABASE_CONFIG, GOB_DATABASE_CONFIG
+from gobeventproducer.database.model import Base, LastSentEvent
 
-logging.getLogger("kafka").setLevel(logging.WARNING)
+logging.getLogger("eventproducer").setLevel(logging.WARNING)
 
 
 def _to_bytes(s: str):
@@ -23,6 +22,7 @@ def _to_bytes(s: str):
 
 
 class EventDataBuilder:
+    """Helper class that generates external event data."""
 
     def __init__(self, gob_db_session, gob_db_base, catalogue: str, collection_name: str):
         self.db_session = gob_db_session
@@ -51,6 +51,7 @@ class EventDataBuilder:
         return gob_model.get_table_name_from_ref(reference)
 
     def build_event(self, tid: str) -> dict:
+        """Build event data for object with given tid."""
         query = self.db_session.query(self.basetable).filter(self.basetable._tid == tid)
         obj = query.one()
 
@@ -81,27 +82,79 @@ class EventDataBuilder:
         return result
 
 
-class KafkaEventProducer:
-    FLUSH_PER = 10000
+class LocalDatabaseConnection:
+    """Abstraction for receiving and updating the last event that is sent."""
+
+    def __init__(self, catalogue: str, collection: str):
+        self.catalogue = catalogue
+        self.collection = collection
+        self.session = None
+        self.last_event = None
+
+    def _connect(self):
+        engine = create_engine(URL(**DATABASE_CONFIG), connect_args={'sslmode': 'require'})
+        Base.metadata.bind = engine
+        self.session = Session(engine)
+
+    def __enter__(self):
+        """Enter context, connect to local database."""
+        self._connect()
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        """Exit context, commit last event to database."""
+        self.session.commit()
+
+    def get_last_event(self) -> LastSentEvent:
+        """Return the last event.
+
+        The last event is either saved locally in this class, fetched from the database, or a newly generated
+        object.
+        """
+        if self.last_event:
+            return self.last_event
+
+        self.last_event = self.session \
+            .query(LastSentEvent) \
+            .filter_by(catalogue=self.catalogue, collection=self.collection) \
+            .first()
+
+        if not self.last_event:
+            self.last_event = LastSentEvent(
+                catalogue=self.catalogue, collection=self.collection, last_event=-1)
+            self.session.add(self.last_event)
+
+        return self.last_event
+
+    def get_last_eventid(self):
+        """Return last event id."""
+        return self.get_last_event().last_event
+
+    def set_last_eventid(self, eventid: int):
+        """Update last event id."""
+        self.get_last_event().last_event = eventid
+
+
+class EventProducer:
+    """Produce events for external consumers."""
 
     def __init__(self, catalogue: str, collection_name: str, logger):
         self.catalogue = catalogue
         self.collection = collection_name
         self.logger = logger
         self.gob_db_session = None
-        self.db_session = None
+        self.total_cnt = 0
         self.gob_db_base = None
         self.Event = None
-        self.producer = None
-        self.total_cnt = 0
+        self.routing_key = f"{catalogue}.{collection_name}"
+        self._init_gob_db_session()
 
-        self._init_connections()
-
-        self.event_builder = EventDataBuilder(
-            self.gob_db_session, self.gob_db_base, catalogue, collection_name)
+        self.event_builder = EventDataBuilder(self.gob_db_session, self.gob_db_base, catalogue, collection_name)
 
     def _get_tables_to_reflect(self):
-        """Returns tables to reflect:
+        """Return tables to reflect.
+
+        Tables that are reflected:
         - events
         - object table (e.g. gebieden_buurten)
         - relation tables (e.g. rel_gb_brt_gbd_wijk_ligt_in_wijk, ...)
@@ -112,16 +165,15 @@ class KafkaEventProducer:
         relation_tables = [gob_model.get_table_name('rel', rel_table) for rel_table in relations.values()]
 
         return [
-                   'events',
-                   gob_model.get_table_name(self.catalogue, self.collection)
-               ] + relation_tables
+            'events',
+            gob_model.get_table_name(self.catalogue, self.collection)
+        ] + relation_tables
 
     def _init_gob_db_session(self):
-        """Inits db session for gob db (to access events)
+        """Init db session for gob db (to access events).
 
         :return:
         """
-
         engine = create_engine(URL(**GOB_DATABASE_CONFIG), connect_args={'sslmode': 'require'})
         self.gob_db_session = Session(engine)
         meta = MetaData()
@@ -132,62 +184,17 @@ class KafkaEventProducer:
         self.gob_db_base = base
         self.logger.info("Initialised events storage")
 
-    def _init_local_db_session(self):
-        """Inits db session for local (gob_kafka) db
-
-        :return:
-        """
-        engine = create_engine(URL(**DATABASE_CONFIG), connect_args={'sslmode': 'require'})
-        Base.metadata.bind = engine
-        self.db_session = Session(engine)
-
-    def _init_kafka(self):
-        self.producer = KafkaProducer(
-            **KAFKA_CONNECTION_CONFIG,
-            max_in_flight_requests_per_connection=1,
-            # With retries, max_in_flight should always be 1 to ensure ordering of batches!
-            retries=3)
-        self.logger.info("Initialised Kafka connection")
-
-    def _init_connections(self):
-        self._init_gob_db_session()
-        self._init_local_db_session()
-        self._init_kafka()
-
-    def _get_last_event(self):
-        last_event = self.db_session \
-            .query(LastSentEvent) \
-            .filter_by(catalogue=self.catalogue, collection=self.collection) \
-            .first()
-
-        return last_event
-
-    def _get_last_eventid(self):
-        last_event = self._get_last_event()
-        return last_event.last_event if last_event else -1
-
-    def _set_last_eventid(self, eventid: int):
-        last_event = self._get_last_event()
-
-        if last_event:
-            last_event.last_event = eventid
-        else:
-            last_event = LastSentEvent(
-                catalogue=self.catalogue, collection=self.collection, last_event=eventid)
-            self.db_session.add(last_event)
-
-        self.db_session.commit()
-
-    def _get_events(self, min_eventid: int):
+    def _get_events(self, min_eventid: int, max_eventid: int):
         return self.gob_db_session \
             .query(self.Event) \
             .yield_per(10000) \
             .filter(and_(self.Event.catalogue == self.catalogue,
                          self.Event.entity == self.collection,
-                         self.Event.eventid > min_eventid)) \
+                         self.Event.eventid > min_eventid,
+                         self.Event.eventid <= max_eventid)) \
             .order_by(self.Event.eventid.asc())
 
-    def _add_event(self, event):
+    def _add_event(self, event, connection):
         header = {
             'event_type': event.action,
             'event_id': event.eventid,
@@ -195,37 +202,38 @@ class KafkaEventProducer:
             'catalog': event.catalogue,
             'collection': event.entity,
         }
-        headers = [(k, _to_bytes(str(v)) if v else b'') for k, v in header.items()]
         data = self.event_builder.build_event(event.tid)
 
-        self.producer.send(
-            KAFKA_TOPIC,
-            key=_to_bytes(header['tid']),
-            value=_to_bytes(json.dumps(data)),
-            headers=headers
-        )
+        msg = {
+            'header': header,
+            'data': data
+        }
+        connection.publish(EVENTS_EXCHANGE, self.routing_key, msg)
 
-    def _flush(self, last_eventid: int):
-        self.producer.flush(timeout=120)
-        self._set_last_eventid(last_eventid)
-        print(f"Flushed Kafka events. Total events: {self.total_cnt}. Last event id: {last_eventid}")
+    def produce(self, min_eventid: int, max_eventid: int):
+        """Produce external events starting from min_eventid (exclusive) until max_eventid (inclusive)."""
+        start_eventid = min_eventid
 
-    def produce(self):
-        last_eventid = self._get_last_eventid()
-        self.logger.info(f"Start producing. Last event was {last_eventid}")
+        with LocalDatabaseConnection(self.catalogue, self.collection) as localdb:
+            last_eventid = localdb.get_last_eventid()
 
-        events = self._get_events(last_eventid)
+            # Ideally we would remove the need for the database. We keep the database in place now to be able to spot
+            # any errors thay may arise when min_eventid does not match the expected last_eventid.
+            if last_eventid != min_eventid:
+                self.logger.warning(f"Min eventid ({min_eventid}) to produce does not match last_eventid "
+                                    f"({last_eventid}) in database. Recovering.")
+                start_eventid = last_eventid
 
-        for event in events:
-            self._add_event(event)
+            self.logger.info(f"Start producing events > {start_eventid} and <= {max_eventid}")
 
-            self.total_cnt += 1
-            last_eventid = event.eventid
+            events = self._get_events(start_eventid, max_eventid)
 
-            self.gob_db_session.expunge(event)
+            with AsyncConnection(CONNECTION_PARAMS) as rabbitconn:
+                for event in events:
+                    self._add_event(event, rabbitconn)
 
-            if self.total_cnt % self.FLUSH_PER == 0:
-                self._flush(last_eventid)
+                    self.gob_db_session.expunge(event)
+                    localdb.set_last_eventid(event.eventid)
+                    self.total_cnt += 1
 
-        self._flush(last_eventid)
-        self.logger.info(f"Produced {self.total_cnt} Kafka events")
+            self.logger.info(f"Produced {self.total_cnt} events")

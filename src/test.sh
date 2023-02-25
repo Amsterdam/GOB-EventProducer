@@ -7,10 +7,10 @@ set -e # stop on any error
 export COVERAGE_FILE=/tmp/.coverage
 
 echo "Running unit tests"
-coverage run --source=./gobkafkaproducer --module pytest tests/
+coverage run --source=./gobeventproducer --module pytest tests/
 
 echo "Coverage report"
 coverage report --show-missing --fail-under=100
 
 echo "Running style checks"
-flake8 ./gobkafkaproducer
+flake8 ./gobeventproducer

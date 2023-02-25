@@ -6,15 +6,15 @@ from sqlalchemy.exc import DBAPIError
 from sqlalchemy.engine.url import URL
 from sqlalchemy.orm import Session
 
-from gobkafkaproducer.database.model import Base
-from gobkafkaproducer.config import DATABASE_CONFIG
+from gobeventproducer.database.model import Base
+from gobeventproducer.config import DATABASE_CONFIG
 
 session = None
 engine = None
 
 
 def connect(force_migrate=False):
-    """Module initialisation
+    """Connect to database.
 
     The connection with the underlying storage is initialised.
     Meta information is available via the Base variable.
@@ -42,7 +42,7 @@ def connect(force_migrate=False):
 
 
 def disconnect():
-    """Disconnect from the database
+    """Disconnect from the database.
 
     Cancel any running transactions and close the session and engine
 
@@ -65,7 +65,7 @@ def disconnect():
 
 
 def is_connected():
-    """Is connected
+    """Is connected.
 
     Tells whether the database connection is alive
 

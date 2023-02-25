@@ -11,7 +11,7 @@ MAINTAINER datapunt@amsterdam.nl
 # Fill the wheelhouse.
 COPY --from=wheelhouse /opt/wheelhouse /opt/wheelhouse
 
-# Install gobkafkaproducer in /app folder.
+# Install gobeventproducer in /app folder.
 WORKDIR /app
 
 # Install required Python packages.
@@ -22,15 +22,15 @@ RUN rm requirements.txt
 # Wheelhouse cleanup.
 RUN rm -rf /opt/wheelhouse
 
-# Copy gobkafkaproducer module.
-COPY gobkafkaproducer gobkafkaproducer
+# Copy gobeventproducer module.
+COPY gobeventproducer gobeventproducer
 
 # Copy Alembic config.
 COPY alembic alembic
 COPY alembic.ini alembic.ini
 
 USER datapunt
-CMD ["python", "-m", "gobkafkaproducer"]
+CMD ["python", "-m", "gobeventproducer"]
 
 
 # Test.
@@ -42,7 +42,7 @@ RUN rm -rf /app/src/gobcore/tests
 RUN rm -rf /app/src/gobconfig/tests
 
 # Copy test module and tests.
-COPY test.sh .flake8 pytest.ini ./
+COPY test.sh pyproject.toml ./
 COPY tests tests
 
 # Copy Jenkins files.
