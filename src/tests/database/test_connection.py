@@ -1,9 +1,9 @@
 from unittest import TestCase, mock
 
 
-import gobkafkaproducer.database
+import gobeventproducer.database
 
-from gobkafkaproducer.database.connection import connect, migrate_storage, disconnect, is_connected
+from gobeventproducer.database.connection import connect, migrate_storage, disconnect, is_connected
 
 class MockedService:
 
@@ -98,12 +98,12 @@ def raise_exception(e):
 class TestStorage(TestCase):
 
     def setUp(self):
-        gobkafkaproducer.database.connection.engine = MockedEngine()
-        gobkafkaproducer.database.connection.session = MockedSession()
+        gobeventproducer.database.connection.engine = MockedEngine()
+        gobeventproducer.database.connection.session = MockedSession()
 
-    @mock.patch("gobkafkaproducer.database.connection.URL.create")
-    @mock.patch("gobkafkaproducer.database.connection.migrate_storage")
-    @mock.patch("gobkafkaproducer.database.connection.create_engine")
+    @mock.patch("gobeventproducer.database.connection.URL.create")
+    @mock.patch("gobeventproducer.database.connection.migrate_storage")
+    @mock.patch("gobeventproducer.database.connection.create_engine")
     def test_connect(self, mock_create, mock_migrate, mock_url):
         result = connect()
 
@@ -112,9 +112,9 @@ class TestStorage(TestCase):
         self.assertEqual(result, True)
         self.assertEqual(is_connected(), True)
 
-    @mock.patch("gobkafkaproducer.database.connection.DBAPIError", MockException)
-    @mock.patch("gobkafkaproducer.database.connection.create_engine", mock.MagicMock())
-    @mock.patch("gobkafkaproducer.database.connection.migrate_storage", lambda argv: raise_exception(MockException))
+    @mock.patch("gobeventproducer.database.connection.DBAPIError", MockException)
+    @mock.patch("gobeventproducer.database.connection.create_engine", mock.MagicMock())
+    @mock.patch("gobeventproducer.database.connection.migrate_storage", lambda argv: raise_exception(MockException))
     def test_connect_error(self):
         # Operation errors should be catched
         result = connect()
@@ -122,16 +122,16 @@ class TestStorage(TestCase):
         self.assertEqual(result, False)
         self.assertEqual(is_connected(), False)
 
-    @mock.patch("gobkafkaproducer.database.connection.migrate_storage", lambda force_migrate: raise_exception(MockException))
-    @mock.patch("gobkafkaproducer.database.connection.create_engine", mock.MagicMock())
+    @mock.patch("gobeventproducer.database.connection.migrate_storage", lambda force_migrate: raise_exception(MockException))
+    @mock.patch("gobeventproducer.database.connection.create_engine", mock.MagicMock())
     def test_connect_other_error(self):
         # Only operational errors should be catched
         with self.assertRaises(MockException):
             connect()
 
-    @mock.patch("gobkafkaproducer.database.connection.engine.dispose")
-    @mock.patch("gobkafkaproducer.database.connection.session.close")
-    @mock.patch("gobkafkaproducer.database.connection.session.rollback")
+    @mock.patch("gobeventproducer.database.connection.engine.dispose")
+    @mock.patch("gobeventproducer.database.connection.session.close")
+    @mock.patch("gobeventproducer.database.connection.session.rollback")
     def test_disconnect(self, mock_rollback, mock_close, mock_dispose):
 
         disconnect()
@@ -140,25 +140,25 @@ class TestStorage(TestCase):
         mock_close.assert_called()
         mock_dispose.assert_called()
 
-        self.assertEqual(gobkafkaproducer.database.connection.session, None)
-        self.assertEqual(gobkafkaproducer.database.connection.engine, None)
+        self.assertEqual(gobeventproducer.database.connection.session, None)
+        self.assertEqual(gobeventproducer.database.connection.engine, None)
         self.assertEqual(is_connected(), False)
 
-    @mock.patch("gobkafkaproducer.database.connection.DBAPIError", MockException)
-    @mock.patch("gobkafkaproducer.database.connection.engine.dispose", lambda: raise_exception(MockException))
-    @mock.patch("gobkafkaproducer.database.connection.session.close", mock.MagicMock())
-    @mock.patch("gobkafkaproducer.database.connection.session.rollback", mock.MagicMock())
+    @mock.patch("gobeventproducer.database.connection.DBAPIError", MockException)
+    @mock.patch("gobeventproducer.database.connection.engine.dispose", lambda: raise_exception(MockException))
+    @mock.patch("gobeventproducer.database.connection.session.close", mock.MagicMock())
+    @mock.patch("gobeventproducer.database.connection.session.rollback", mock.MagicMock())
     def test_disconnect_operational_error(self):
         # Operation errors should be catched
 
         disconnect()
 
-        self.assertEqual(gobkafkaproducer.database.connection.session, None)
-        self.assertEqual(gobkafkaproducer.database.connection.engine, None)
+        self.assertEqual(gobeventproducer.database.connection.session, None)
+        self.assertEqual(gobeventproducer.database.connection.engine, None)
 
-    @mock.patch("gobkafkaproducer.database.connection.engine.dispose", lambda: raise_exception(MockException))
-    @mock.patch("gobkafkaproducer.database.connection.session.close", mock.MagicMock())
-    @mock.patch("gobkafkaproducer.database.connection.session.rollback", mock.MagicMock())
+    @mock.patch("gobeventproducer.database.connection.engine.dispose", lambda: raise_exception(MockException))
+    @mock.patch("gobeventproducer.database.connection.session.close", mock.MagicMock())
+    @mock.patch("gobeventproducer.database.connection.session.rollback", mock.MagicMock())
     def test_disconnect_other_error(self):
         # Only operational errors should be catched
 
@@ -169,14 +169,14 @@ class TestStorage(TestCase):
         result = is_connected()
         self.assertEqual(result, False)
 
-    @mock.patch("gobkafkaproducer.database.connection.session.execute", mock.MagicMock())
+    @mock.patch("gobeventproducer.database.connection.session.execute", mock.MagicMock())
     def test_is_connected_ok(self):
         result = is_connected()
         self.assertEqual(result, True)
 
-    @mock.patch("gobkafkaproducer.database.connection.alembic.config")
-    @mock.patch('gobkafkaproducer.database.connection.alembic.script')
-    @mock.patch('gobkafkaproducer.database.connection.migration')
+    @mock.patch("gobeventproducer.database.connection.alembic.config")
+    @mock.patch('gobeventproducer.database.connection.alembic.script')
+    @mock.patch('gobeventproducer.database.connection.migration')
     def test_migrate_storage(self, mock_migration, mock_script, mock_config):
         context = mock.MagicMock()
         context.get_current_revision.return_value = "revision 1"
@@ -191,9 +191,9 @@ class TestStorage(TestCase):
         self.assertEqual(context.get_current_revision.call_count, 1)
         mock_config.main.assert_called()
 
-    @mock.patch("gobkafkaproducer.database.connection.alembic.config")
-    @mock.patch('gobkafkaproducer.database.connection.alembic.script')
-    @mock.patch('gobkafkaproducer.database.connection.migration')
+    @mock.patch("gobeventproducer.database.connection.alembic.config")
+    @mock.patch('gobeventproducer.database.connection.alembic.script')
+    @mock.patch('gobeventproducer.database.connection.migration')
     def test_migrate_storage_up_to_date(self, mock_migration, mock_script, mock_config):
         context = mock.MagicMock()
         context.get_current_revision.return_value = "revision 2"
@@ -208,9 +208,9 @@ class TestStorage(TestCase):
         self.assertEqual(context.get_current_revision.call_count, 1)
         mock_config.main.assert_not_called()
 
-    @mock.patch("gobkafkaproducer.database.connection.alembic.config")
-    @mock.patch('gobkafkaproducer.database.connection.alembic.script')
-    @mock.patch('gobkafkaproducer.database.connection.migration')
+    @mock.patch("gobeventproducer.database.connection.alembic.config")
+    @mock.patch('gobeventproducer.database.connection.alembic.script')
+    @mock.patch('gobeventproducer.database.connection.migration')
     def test_migrate_storage_exception(self, mock_migration, mock_script, mock_config):
         context = mock.MagicMock()
         context.get_current_revision.return_value = "revision 1"

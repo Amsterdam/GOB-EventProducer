@@ -1,9 +1,7 @@
-# GOB-KafkaProducer
+# GOB-EventProducer
 
-Reads GOB events from RabbitMQ event exchange and writes to events to a Kafka server.
-
-Note: Only one instance of this service should be run at any given time, as running multiple instances in parallel does
-not guarantee ordered delivery of events. Support for parallelisation should be implemented in the future.
+Reads GOB events from RabbitMQ event exchange, transforms the events to a generic format and sends the transformed
+events to a different exchange.
 
 # Environment variables
 Example environment variables are set in `.env.example`. Create your own `.env` based on this example file:
@@ -71,7 +69,7 @@ Start the service:
 
 ```bash
 cd src
-python -m gobkafkaproducer
+python -m gobeventproducer
 ```
 
 ## Tests

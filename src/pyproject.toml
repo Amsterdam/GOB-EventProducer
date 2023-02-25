@@ -1,0 +1,44 @@
+[tool.coverage.report]
+show_missing = true
+exclude_lines = [
+    # Have to re-enable the standard pragma
+    "pragma: no cover",
+
+    # ignore type checking
+    "if TYPE_CHECKING:",
+
+    # Don't complain if tests don't hit defensive assertion code:
+    "raise AssertionError",
+    "raise NotImplementedError",
+
+    # Don't complain if non-runnable code isn't run:
+    "if __name__ == .__main__.:",
+
+    # Don't complain about abstract methods, they aren't run:
+    "@(abc\\.)?abstractmethod"
+]
+
+[tool.flake8]
+exclude = ["tests"]
+max-complexity = 6
+max-line-length = 120
+show_source = true
+ignore = [
+    # Missing docstring in __init__
+    "D107",
+    # Missing docstring in public package
+    "D104",
+    # Missing docstring in module
+    "D100",
+    # line break before binary operator
+    "W503"
+]
+
+[tool.pytest.ini_options]
+testpaths = "tests"
+cache_dir = "/tmp/.pytest_cache"
+addopts = [
+    "-vv",
+    "--doctest-modules",
+    "--cache-clear"
+]

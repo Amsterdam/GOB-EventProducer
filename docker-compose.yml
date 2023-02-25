@@ -2,30 +2,35 @@ version: '3.7'
 
 services:
 
-  gobkafkaproducer:
+  gobeventproducer:
+    env_file: ./.env
     build: src
-    container_name: gobkafkaproducer
     environment:
       MESSAGE_BROKER_ADDRESS: rabbitmq
       API_HOST: http://gobapi:8001
       GOB_SHARED_DIR: /app/shared
-      GOB_KAFKAPRODUCER_DATABASE_HOST: kafkaproducer_database
-      GOB_KAFKAPRODUCER_DATABASE_PORT: 5432
-      GOB_KAFKAPRODUCER_DATABASE_USER: ${GOB_KAFKAPRODUCER_DATABASE_USER}
-      GOB_KAFKAPRODUCER_DATABASE_PASSWORD: ${GOB_KAFKAPRODUCER_DATABASE_PASSWORD}
-      GOB_KAFKAPRODUCER_DATABASE: ${GOB_KAFKAPRODUCER_DATABASE}
+      GOB_EVENTPRODUCER_DATABASE_HOST: eventproducer_database
+      GOB_EVENTPRODUCER_DATABASE_PORT: 5432
+      GOB_EVENTPRODUCER_DATABASE_USER: gob_eventproducer
+      GOB_EVENTPRODUCER_DATABASE_PASSWORD: insecure
+      GOB_EVENTPRODUCER_DATABASE: gob_eventproducer
+      GOB_DATABASE_PORT_OVERRIDE: 5432
+      GOB_DATABASE_HOST_OVERRIDE: database
+
     volumes:
       - gob-volume:/app/shared
+      - ./src/gobeventproducer:/app/gobeventproducer
+      - ${GOB_CORE_DIR-../GOB-Core}:/app/GOB-Core
+      - ${GOB_CONFIG_DIR-../GOB-Config}:/app/GOB-Config
 
-  kafkaproducer_database:
+  eventproducer_database:
     image: amsterdam/postgres11
     ports:
-      - "5410:5432"
-    container_name: kafkaproducer_database
+      - "5430:5432"
     environment:
       POSTGRES_PASSWORD: insecure
-      POSTGRES_DB: gob_kafka
-      POSTGRES_USER: gob_kafka
+      POSTGRES_DB: gob_eventproducer
+      POSTGRES_USER: gob_eventproducer
     volumes:
       - "~/.ssh/datapunt.key:/root/.ssh/datapunt.key"
     shm_size: '1gb'

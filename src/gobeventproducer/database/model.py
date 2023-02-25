@@ -5,6 +5,7 @@ Base = declarative_base()
 
 
 class LastSentEvent(Base):
+    """Holds the last event ID that is sent for the given catalog/collection."""
 
     __tablename__ = "last_sent_events"
 
@@ -13,4 +14,5 @@ class LastSentEvent(Base):
     last_event = Column(Integer, doc='The id of the last event sent')
 
     def __repr__(self):
+        """Represent this object as string."""
         return f'<LastSentEvent {self.catalogue} {self.collection} ({self.last_event})>'
