@@ -2,12 +2,12 @@ import alembic.config
 import alembic.script
 from alembic.runtime import migration
 from sqlalchemy import create_engine
-from sqlalchemy.exc import DBAPIError
 from sqlalchemy.engine.url import URL
+from sqlalchemy.exc import DBAPIError
 from sqlalchemy.orm import Session
 
-from gobeventproducer.database.model import Base
 from gobeventproducer.config import DATABASE_CONFIG
+from gobeventproducer.database.local.model import Base
 
 session = None
 engine = None
@@ -25,7 +25,7 @@ def connect(force_migrate=False):
     global session, engine
 
     try:
-        engine = create_engine(URL.create(**DATABASE_CONFIG), connect_args={'sslmode': 'require'})
+        engine = create_engine(URL.create(**DATABASE_CONFIG), connect_args={"sslmode": "require"})
 
         migrate_storage(force_migrate)
 
@@ -106,23 +106,24 @@ def migrate_storage(force_migrate):
 
     try:
         # Check if storage is up-to-date
-        alembic_cfg = alembic.config.Config('alembic.ini')
+        alembic_cfg = alembic.config.Config("alembic.ini")
         script = alembic.script.ScriptDirectory.from_config(alembic_cfg)
         with engine.begin() as conn:
             context = migration.MigrationContext.configure(conn)
             up_to_date = context.get_current_revision() == script.get_current_head()
 
         if not up_to_date:
-            print('Migrating storage')
+            print("Migrating storage")
             alembicArgs = [
-                '--raiseerr',
-                'upgrade', 'head',
+                "--raiseerr",
+                "upgrade",
+                "head",
             ]
             alembic.config.main(argv=alembicArgs)
     except Exception as e:
-        print(f'Storage migration failed: {str(e)}')
+        print(f"Storage migration failed: {str(e)}")
     else:  # No exception
-        print('Storage is up-to-date')
+        print("Storage is up-to-date")
 
     # Always unlock
     engine.execute(f"SELECT pg_advisory_unlock({MIGRATION_LOCK})")
