@@ -1,6 +1,6 @@
 from unittest import TestCase
 
-from gobeventproducer.database.model import LastSentEvent
+from gobeventproducer.database.local.model import LastSentEvent
 
 
 class TestLastSentEvent(TestCase):
