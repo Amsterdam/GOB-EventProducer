@@ -1,12 +1,10 @@
 from unittest import TestCase, mock
 
-
 import gobeventproducer.database
+from gobeventproducer.database.local.connection import connect, disconnect, is_connected, migrate_storage
 
-from gobeventproducer.database.local.connection import connect, migrate_storage, disconnect, is_connected
 
 class MockedService:
-
     service_id = None
     id = None
     host = None
@@ -15,8 +13,8 @@ class MockedService:
     def __init__(self, **kwargs):
         self.__dict__.update(kwargs)
 
-class MockedSession:
 
+class MockedSession:
     def __init__(self):
         self._first = None
         self._add = None
@@ -72,8 +70,8 @@ class MockedSession:
         self.update_args = args
         return 1
 
-class MockedEngine:
 
+class MockedEngine:
     def dispose(self):
         pass
 
@@ -89,14 +87,16 @@ class MockedEngine:
     def __exit__(self, *args):
         pass
 
+
 class MockException(Exception):
     pass
+
 
 def raise_exception(e):
     raise e("Raised")
 
-class TestStorage(TestCase):
 
+class TestStorage(TestCase):
     def setUp(self):
         gobeventproducer.database.local.connection.engine = MockedEngine()
         gobeventproducer.database.local.connection.session = MockedSession()
@@ -107,14 +107,16 @@ class TestStorage(TestCase):
     def test_connect(self, mock_create, mock_migrate, mock_url):
         result = connect()
 
-        mock_create.assert_called_with(mock_url.return_value, connect_args={'sslmode': 'require'})
+        mock_create.assert_called_with(mock_url.return_value, connect_args={"sslmode": "require"})
         mock_migrate.assert_called()
         self.assertEqual(result, True)
         self.assertEqual(is_connected(), True)
 
     @mock.patch("gobeventproducer.database.local.connection.DBAPIError", MockException)
     @mock.patch("gobeventproducer.database.local.connection.create_engine", mock.MagicMock())
-    @mock.patch("gobeventproducer.database.local.connection.migrate_storage", lambda argv: raise_exception(MockException))
+    @mock.patch(
+        "gobeventproducer.database.local.connection.migrate_storage", lambda argv: raise_exception(MockException)
+    )
     def test_connect_error(self):
         # Operation errors should be catched
         result = connect()
@@ -122,7 +124,10 @@ class TestStorage(TestCase):
         self.assertEqual(result, False)
         self.assertEqual(is_connected(), False)
 
-    @mock.patch("gobeventproducer.database.local.connection.migrate_storage", lambda force_migrate: raise_exception(MockException))
+    @mock.patch(
+        "gobeventproducer.database.local.connection.migrate_storage",
+        lambda force_migrate: raise_exception(MockException),
+    )
     @mock.patch("gobeventproducer.database.local.connection.create_engine", mock.MagicMock())
     def test_connect_other_error(self):
         # Only operational errors should be catched
@@ -133,7 +138,6 @@ class TestStorage(TestCase):
     @mock.patch("gobeventproducer.database.local.connection.session.close")
     @mock.patch("gobeventproducer.database.local.connection.session.rollback")
     def test_disconnect(self, mock_rollback, mock_close, mock_dispose):
-
         disconnect()
 
         mock_rollback.assert_called()
@@ -175,8 +179,8 @@ class TestStorage(TestCase):
         self.assertEqual(result, True)
 
     @mock.patch("gobeventproducer.database.local.connection.alembic.config")
-    @mock.patch('gobeventproducer.database.local.connection.alembic.script')
-    @mock.patch('gobeventproducer.database.local.connection.migration')
+    @mock.patch("gobeventproducer.database.local.connection.alembic.script")
+    @mock.patch("gobeventproducer.database.local.connection.migration")
     def test_migrate_storage(self, mock_migration, mock_script, mock_config):
         context = mock.MagicMock()
         context.get_current_revision.return_value = "revision 1"
@@ -192,8 +196,8 @@ class TestStorage(TestCase):
         mock_config.main.assert_called()
 
     @mock.patch("gobeventproducer.database.local.connection.alembic.config")
-    @mock.patch('gobeventproducer.database.local.connection.alembic.script')
-    @mock.patch('gobeventproducer.database.local.connection.migration')
+    @mock.patch("gobeventproducer.database.local.connection.alembic.script")
+    @mock.patch("gobeventproducer.database.local.connection.migration")
     def test_migrate_storage_up_to_date(self, mock_migration, mock_script, mock_config):
         context = mock.MagicMock()
         context.get_current_revision.return_value = "revision 2"
@@ -209,8 +213,8 @@ class TestStorage(TestCase):
         mock_config.main.assert_not_called()
 
     @mock.patch("gobeventproducer.database.local.connection.alembic.config")
-    @mock.patch('gobeventproducer.database.local.connection.alembic.script')
-    @mock.patch('gobeventproducer.database.local.connection.migration')
+    @mock.patch("gobeventproducer.database.local.connection.alembic.script")
+    @mock.patch("gobeventproducer.database.local.connection.migration")
     def test_migrate_storage_exception(self, mock_migration, mock_script, mock_config):
         context = mock.MagicMock()
         context.get_current_revision.return_value = "revision 1"

@@ -1,16 +1,16 @@
 from __future__ import with_statement
 
 import sys
-
-from alembic import context
-from sqlalchemy import engine_from_config, pool
-from sqlalchemy.engine.url import URL
 from logging.config import fileConfig
 
+from sqlalchemy import engine_from_config, pool
+from sqlalchemy.engine.url import URL
 
-sys.path.append('.')
-from gobeventproducer.database.model import Base
+from alembic import context
+
+sys.path.append(".")
 from gobeventproducer.config import DATABASE_CONFIG
+from gobeventproducer.database.model import Base
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
@@ -33,9 +33,7 @@ target_metadata = Base.metadata
 
 
 def include_object(object, name, type_, reflected, compare_to):
-    skip_objects = [
-        'spatial_ref_sys'
-    ]
+    skip_objects = ["spatial_ref_sys"]
 
     return not name in skip_objects
 
@@ -49,20 +47,13 @@ def run_migrations_online():
     """
     # Register database URL
     ini_section = config.get_section(config.config_ini_section)
-    ini_section['sqlalchemy.url'] = URL(**DATABASE_CONFIG)
+    ini_section["sqlalchemy.url"] = URL(**DATABASE_CONFIG)
 
     # Connect to database
-    connectable = engine_from_config(
-        ini_section,
-        prefix='sqlalchemy.',
-        poolclass=pool.NullPool)
+    connectable = engine_from_config(ini_section, prefix="sqlalchemy.", poolclass=pool.NullPool)
 
     with connectable.connect() as connection:
-        context.configure(
-            connection=connection,
-            target_metadata=target_metadata,
-            include_object=include_object
-        )
+        context.configure(connection=connection, target_metadata=target_metadata, include_object=include_object)
 
         with context.begin_transaction():
             context.run_migrations()

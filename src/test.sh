@@ -23,6 +23,8 @@ DIRTY_FILES=(
   ./gobeventproducer/database/gob/contextmanager.py
   ./gobeventproducer/database/gob/__init__.py
   ./gobeventproducer/config.py
+  ./gobeventproducer/mapping/__init__.py
+  ./gobeventproducer/mapper.py
   ./gobeventproducer/producer.py
   ./gobeventproducer/eventbuilder.py
 )
@@ -31,7 +33,7 @@ DIRTY_FILES=(
 CLEAN_FILES=$(echo ${FILES[@]} ${DIRTY_FILES[@]} | tr ' ' '\n' | sort | uniq -u | tr '\n' ' ')
 
 echo "Running mypy on non-dirty files"
-mypy --follow-imports=skip ${CLEAN_FILES[@]}
+mypy --follow-imports=skip --install-types ${CLEAN_FILES[@]}
 
 echo "\nRunning unit tests"
 coverage run --source=gobeventproducer -m pytest

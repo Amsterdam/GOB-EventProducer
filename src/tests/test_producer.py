@@ -1,6 +1,7 @@
 from unittest import TestCase
-from unittest.mock import patch, MagicMock, call
+from unittest.mock import MagicMock, call, patch
 
+from gobeventproducer.mapper import PassThroughEventDataMapper
 from gobeventproducer.producer import EventProducer
 from tests.mocks.asyncconnection import AsyncConnectionMock
 from tests.mocks.eventbuilder import MockEventBuilder
@@ -15,21 +16,30 @@ class MockEvent:
 
 
 class TestEventProducer(TestCase):
+    def test_init_mapper(self):
+        p = EventProducer("nap", "peilmerken", MagicMock())
+        self.assertEqual("nap", p.mapper.mapping_definition.catalog)
+        self.assertEqual("peilmerken", p.mapper.mapping_definition.collection)
+
+        p = EventProducer("some", "other", MagicMock())
+        self.assertIsInstance(p.mapper, PassThroughEventDataMapper)
+
     def test_add_event(self):
         event = MagicMock()
-        event.action = 'ACTION'
-        event.eventid = 'ID'
+        event.action = "ACTION"
+        event.eventid = "ID"
         event.data = {
-            'some': 'data',
-            'int': 8042,
+            "some": "data",
+            "int": 8042,
         }
         event.last_event = 15480
-        event.catalogue = 'CAT'
-        event.entity = 'COLL'
-        event.tid = 'TID'
+        event.catalogue = "CAT"
+        event.entity = "COLL"
+        event.tid = "TID"
 
-        p = EventProducer('cat', 'coll', MagicMock())
-        p.producer = MagicMock()
+        p = EventProducer("cat", "coll", MagicMock())
+        p.mapper = MagicMock()
+        p.mapper.map.side_effect = lambda x: {**x, "transformed": True}
 
         connection = MagicMock()
         p._add_event(event, connection, MockEventBuilder())
@@ -37,18 +47,26 @@ class TestEventProducer(TestCase):
             "gob.events",
             "cat.coll",
             {
-                'header': {
-                    'event_type': 'ACTION',
-                    'event_id': 'ID',
-                    'tid': 'TID',
-                    'catalog': 'CAT',
-                    'collection': 'COLL',
+                "header": {
+                    "event_type": "ACTION",
+                    "event_id": "ID",
+                    "tid": "TID",
+                    "catalog": "CAT",
+                    "collection": "COLL",
                 },
-                'data': {
-                    'tid': 'TID',
-                    'a': 'A',
-                    'b': 'B',
-                }
+                "data": {
+                    "tid": "TID",
+                    "a": "A",
+                    "b": "B",
+                    "transformed": True,
+                },
+            },
+        )
+        p.mapper.map.assert_called_with(
+            {
+                "tid": "TID",
+                "a": "A",
+                "b": "B",
             }
         )
 
@@ -63,7 +81,7 @@ class TestEventProducer(TestCase):
         gobdb_instance = mock_gobdb.return_value.__enter__.return_value
         gobdb_instance.get_events = MagicMock(return_value=[MockEvent(i) for i in range(event_cnt)])
 
-        p = EventProducer('', '', MagicMock())
+        p = EventProducer("", "", MagicMock())
         p._add_event = MagicMock()
         p.gob_db_session = MagicMock()
         localdb_instance.get_last_eventid = MagicMock(return_value=100)
@@ -72,25 +90,31 @@ class TestEventProducer(TestCase):
 
         gobdb_instance.get_events.assert_called_with(100, 200)
         self.assertEqual(event_cnt, p._add_event.call_count)
-        gobdb_instance.session.expunge.assert_has_calls([
-            call(MockEvent(0)),
-            call(MockEvent(1)),
-            call(MockEvent(2)),
-            call(MockEvent(3)),
-            call(MockEvent(4)),
-        ])
-        localdb_instance.set_last_eventid.assert_has_calls([
-            call(0),
-            call(1),
-            call(2),
-            call(3),
-            call(4),
-        ])
+        gobdb_instance.session.expunge.assert_has_calls(
+            [
+                call(MockEvent(0)),
+                call(MockEvent(1)),
+                call(MockEvent(2)),
+                call(MockEvent(3)),
+                call(MockEvent(4)),
+            ]
+        )
+        localdb_instance.set_last_eventid.assert_has_calls(
+            [
+                call(0),
+                call(1),
+                call(2),
+                call(3),
+                call(4),
+            ]
+        )
         p.logger.warning.assert_not_called()
 
         # min_eventid does not match start_event
         p.produce(110, 200)
-        p.logger.warning.assert_called_with("Min eventid (110) to produce does not match last_eventid (100) in database. Recovering.")
+        p.logger.warning.assert_called_with(
+            "Min eventid (110) to produce does not match last_eventid (100) in database. Recovering."
+        )
 
         # Test with no last event in database
         localdb_instance.get_last_eventid.return_value = -1
