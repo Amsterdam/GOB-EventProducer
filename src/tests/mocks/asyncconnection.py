@@ -20,4 +20,3 @@ class AsyncConnectionMock:
 
     def assert_connected_with(self, connection_params: str):
         assert self.connection_params == connection_params
-

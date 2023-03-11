@@ -35,7 +35,6 @@ def new_events_notification_handler(msg):
 
 def event_produce_handler(msg):
     """Handle event produce request message."""
-    logger.configure(msg, "EVENT_PRODUCE")
     logger.info("Produce Events")
 
     catalogue = msg.get("header", {}).get("catalogue")
@@ -63,6 +62,7 @@ SERVICEDEFINITION = {
     "event_to_hub_request": {
         "queue": EVENT_PRODUCE_QUEUE,
         "handler": event_produce_handler,
+        "logger": "EVENT_PRODUCE",
         "report": {
             "exchange": WORKFLOW_EXCHANGE,
             "key": EVENT_PRODUCE_RESULT_KEY,

@@ -1,0 +1,12 @@
+catalog: mockalog
+collection: mockection
+version: v1.0.1
+mapping:
+  ligt_in_bouwblok: ligt_in_gebieden_bouwblok
+  bedrag: transactie_bedrag
+  transactie_datum: transactie_datum
+  merk:
+    type: object
+    mapping:
+      code: merk_code
+      omschrijving: merk_omschrijving

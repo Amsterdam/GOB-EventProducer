@@ -6,6 +6,8 @@ from gobcore.message_broker.config import CONNECTION_PARAMS, EVENTS_EXCHANGE
 from gobeventproducer.database.gob.contextmanager import GobDatabaseConnection
 from gobeventproducer.database.local.contextmanager import LocalDatabaseConnection
 from gobeventproducer.eventbuilder import EventDataBuilder
+from gobeventproducer.mapper import EventDataMapper, PassThroughEventDataMapper
+from gobeventproducer.mapping import MappingDefinitionLoader
 
 logging.getLogger("eventproducer").setLevel(logging.WARNING)
 
@@ -13,15 +15,18 @@ logging.getLogger("eventproducer").setLevel(logging.WARNING)
 class EventProducer:
     """Produce events for external consumers."""
 
-    def __init__(self, catalogue: str, collection_name: str, logger):
-        self.catalogue = catalogue
+    def __init__(self, catalog: str, collection_name: str, logger):
+        self.catalog = catalog
         self.collection = collection_name
         self.logger = logger
         self.gob_db_session = None
         self.total_cnt = 0
         self.gob_db_base = None
         self.Event = None
-        self.routing_key = f"{catalogue}.{collection_name}"
+        self.routing_key = f"{catalog}.{collection_name}"
+
+        mapping_definition = MappingDefinitionLoader().get(self.catalog, self.collection)
+        self.mapper = EventDataMapper(mapping_definition) if mapping_definition else PassThroughEventDataMapper()
 
     def _add_event(self, event, connection, event_builder: EventDataBuilder):
         header = {
@@ -32,20 +37,21 @@ class EventProducer:
             "collection": event.entity,
         }
         data = event_builder.build_event(event.tid)
+        transformed_data = self.mapper.map(data)
 
-        msg = {"header": header, "data": data}
+        msg = {"header": header, "data": transformed_data}
         connection.publish(EVENTS_EXCHANGE, self.routing_key, msg)
 
     def produce(self, min_eventid: int, max_eventid: int):
         """Produce external events starting from min_eventid (exclusive) until max_eventid (inclusive)."""
         start_eventid = min_eventid
 
-        with LocalDatabaseConnection(self.catalogue, self.collection) as localdb, GobDatabaseConnection(
-            self.catalogue, self.collection, self.logger
+        with LocalDatabaseConnection(self.catalog, self.collection) as localdb, GobDatabaseConnection(
+            self.catalog, self.collection, self.logger
         ) as gobdb:
             last_eventid = localdb.get_last_eventid()
 
-            event_builder = EventDataBuilder(gobdb.session, gobdb.base, self.catalogue, self.collection)
+            event_builder = EventDataBuilder(gobdb.session, gobdb.base, self.catalog, self.collection)
 
             # Ideally we would remove the need for the database. We keep the database in place now to be able to spot
             # any errors thay may arise when min_eventid does not match the expected last_eventid.
