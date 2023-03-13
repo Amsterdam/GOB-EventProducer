@@ -34,7 +34,7 @@ class MappingDefinitionLoader:
         if not self._mapping_definitions:
             self._load()
 
-    def _load_mapping_definition(self, path: Path):
+    def _load_mapping_definition(self, path: Path) -> MappingDefinition:
         with open(path, "r", encoding="utf-8") as f:
             data = yaml.safe_load(f)
             mapping_definition = MappingDefinition.parse_obj(data)
