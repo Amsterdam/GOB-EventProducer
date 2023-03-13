@@ -18,7 +18,7 @@ def tryStep(String message, Closure block, Closure tearDown = null) {
 
 
 node('GOBBUILD') {
-    withEnv(["DOCKER_IMAGE_NAME=datapunt/gob_kafkaproducer:${env.BUILD_NUMBER}"
+    withEnv(["DOCKER_IMAGE_NAME=datapunt/gob_eventproducer:${env.BUILD_NUMBER}"
             ]) {
 
         stage("Checkout") {
@@ -26,12 +26,14 @@ node('GOBBUILD') {
         }
 
         stage('Test') {
-            tryStep "test", {
-                sh "docker-compose -p GOB-KafkaProducer_service -f src/.jenkins/test/docker-compose.yml build --no-cache && " +
-                   "docker-compose -p GOB-KafkaProducer_service -f src/.jenkins/test/docker-compose.yml run --rm test"
+            lock("gob-eventproducer-test") {
+                tryStep "test", {
+                    sh "docker-compose -p GOB-EventProducer_service -f src/.jenkins/test/docker-compose.yml build --no-cache && " +
+                       "docker-compose -p GOB-EventProducer_service -f src/.jenkins/test/docker-compose.yml run --rm test"
 
-            }, {
-                sh "docker-compose -p GOB-KafkaProducer_service -f src/.jenkins/test/docker-compose.yml down"
+                }, {
+                    sh "docker-compose -p GOB-EventProducer_service -f src/.jenkins/test/docker-compose.yml down"
+                }
             }
         }
 
@@ -69,7 +71,7 @@ node('GOBBUILD') {
                         parameters: [
                             [$class: 'StringParameterValue', name: 'INVENTORY', value: 'test'],
                             [$class: 'StringParameterValue', name: 'PLAYBOOK', value: 'deploy.yml'],
-                            [$class: 'StringParameterValue', name: 'PLAYBOOKPARAMS', value: "-e cmdb_id=app_gob-kafkaproducer"],
+                            [$class: 'StringParameterValue', name: 'PLAYBOOKPARAMS', value: "-e cmdb_id=app_gob-eventproducer"],
                         ]
                 }
             }
@@ -93,7 +95,7 @@ node('GOBBUILD') {
                         parameters: [
                             [$class: 'StringParameterValue', name: 'INVENTORY', value: 'acceptance'],
                             [$class: 'StringParameterValue', name: 'PLAYBOOK', value: 'deploy.yml'],
-                            [$class: 'StringParameterValue', name: 'PLAYBOOKPARAMS', value: "-e cmdb_id=app_gob-kafkaproducer"],
+                            [$class: 'StringParameterValue', name: 'PLAYBOOKPARAMS', value: "-e cmdb_id=app_gob-eventproducer"],
                         ]
                 }
             }
