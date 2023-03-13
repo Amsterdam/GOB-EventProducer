@@ -29,7 +29,7 @@ class EventDataMapper(BaseEventDataMapper):
     def __init__(self, mapping_definition: MappingDefinition):
         self.mapping_definition = mapping_definition
 
-    def map(self, eventdata: dict):
+    def map(self, eventdata: EventData) -> EventData:
         """Map the eventdata to the desired format."""
 
         def get_value(eventdata: dict, fieldmapping: FieldMappingTypes):
@@ -40,5 +40,7 @@ class EventDataMapper(BaseEventDataMapper):
                 }
             elif isinstance(fieldmapping, str):
                 return eventdata.get(fieldmapping)
+            else:  # pragma: nocover
+                raise NotImplementedError("Fieldmapping of unexpected type. Please implement.")
 
         return {newkey: get_value(eventdata, mapping) for newkey, mapping in self.mapping_definition.mapping.items()}
