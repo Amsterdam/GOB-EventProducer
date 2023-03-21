@@ -10,7 +10,7 @@ from alembic import context
 
 sys.path.append(".")
 from gobeventproducer.config import DATABASE_CONFIG
-from gobeventproducer.database.model import Base
+from gobeventproducer.database.local.model import Base
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
