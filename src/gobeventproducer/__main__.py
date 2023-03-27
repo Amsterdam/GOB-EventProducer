@@ -19,7 +19,7 @@ def new_events_notification_handler(msg):
     """Handle new events notifications."""
     notification = get_notification(msg)
 
-    if notification.header.get("catalogue") not in LISTEN_TO_CATALOGS:
+    if notification.header.get("catalogue") not in [*LISTEN_TO_CATALOGS, "rel"]:
         return
 
     workflow = {"workflow_name": EVENT_PRODUCE}

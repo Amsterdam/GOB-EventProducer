@@ -14,7 +14,7 @@ class TestMappingDefinitions(TestCase):
         self.assertEqual(
             {
                 "geometrie": "geometrie",
-                "hoogteTovNap": "hoogteTovNap",
+                "hoogte_tov_nap": "hoogte_tov_nap",
                 "identificatie": "identificatie",
                 "jaar": "jaar",
                 "ligt_in_bouwblok": "ligt_in_gebieden_bouwblok",
