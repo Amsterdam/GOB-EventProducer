@@ -2,12 +2,15 @@ import logging
 
 from gobcore.message_broker.async_message_broker import AsyncConnection
 from gobcore.message_broker.config import CONNECTION_PARAMS, EVENTS_EXCHANGE
+from gobcore.model.relations import split_relation_table_name
 
+from gobeventproducer import gob_model
 from gobeventproducer.database.gob.contextmanager import GobDatabaseConnection
 from gobeventproducer.database.local.contextmanager import LocalDatabaseConnection
 from gobeventproducer.eventbuilder import EventDataBuilder
-from gobeventproducer.mapper import EventDataMapper, PassThroughEventDataMapper
+from gobeventproducer.mapper import EventDataMapper, PassThroughEventDataMapper, RelationEventDataMapper
 from gobeventproducer.mapping import MappingDefinitionLoader
+from gobeventproducer.naming import camel_case
 
 logging.getLogger("eventproducer").setLevel(logging.WARNING)
 
@@ -23,18 +26,56 @@ class EventProducer:
         self.total_cnt = 0
         self.gob_db_base = None
         self.Event = None
-        self.routing_key = f"{catalog}.{collection_name}"
+        self.relation_name = None
 
-        mapping_definition = MappingDefinitionLoader().get(self.catalog, self.collection)
-        self.mapper = EventDataMapper(mapping_definition) if mapping_definition else PassThroughEventDataMapper()
+        if catalog == "rel":
+            rel_info = split_relation_table_name(f"rel_{collection_name}")
+
+            main_catalog, main_collection = gob_model.get_catalog_collection_from_abbr(
+                rel_info["src_cat_abbr"], rel_info["src_col_abbr"]
+            )
+            _, dst_collection = gob_model.get_catalog_collection_from_abbr(
+                rel_info["dst_cat_abbr"], rel_info["dst_col_abbr"]
+            )
+            relation_name = rel_info["reference_name"]
+
+            main_catalog_name = main_catalog["name"]
+            main_collection_name = main_collection["name"]
+
+            main_mapping_definition = MappingDefinitionLoader().get(main_catalog_name, main_collection_name)
+            main_mapper = (
+                EventDataMapper(main_mapping_definition) if main_mapping_definition else PassThroughEventDataMapper()
+            )
+            relation_name = main_mapper.get_mapped_name_reverse(relation_name)
+            event_collection_name = f"{main_collection_name}_{camel_case(relation_name)}"
+
+            self.mapper = RelationEventDataMapper()
+
+            # For example, for the relation nap_peilmerken ligt_in_bouwblok, we set
+            # catalog: nap
+            # collection: peilmerken_ligtInBouwblok
+            self.header_data = {
+                "catalog": main_catalog_name,
+                "collection": event_collection_name,
+            }
+            # e.g. nap.rel.peilmerken_ligtInBouwblok
+            self.routing_key = f"{main_catalog_name}.rel.{event_collection_name}"
+
+        else:
+            mapping_definition = MappingDefinitionLoader().get(self.catalog, self.collection)
+            self.mapper = EventDataMapper(mapping_definition) if mapping_definition else PassThroughEventDataMapper()
+            self.header_data = {
+                "catalog": self.catalog,
+                "collection": self.collection,
+            }
+            self.routing_key = f"{catalog}.{collection_name}"
 
     def _add_event(self, event, connection, event_builder: EventDataBuilder):
         header = {
+            **self.header_data,
             "event_type": event.action,
             "event_id": event.eventid,
             "tid": event.tid,
-            "catalog": event.catalogue,
-            "collection": event.entity,
         }
         data = event_builder.build_event(event.tid)
         transformed_data = self.mapper.map(data)

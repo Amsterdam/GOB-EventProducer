@@ -1,7 +1,7 @@
 from unittest import TestCase
 from unittest.mock import MagicMock, call, patch
 
-from gobeventproducer.mapper import PassThroughEventDataMapper
+from gobeventproducer.mapper import PassThroughEventDataMapper, RelationEventDataMapper
 from gobeventproducer.producer import EventProducer
 from tests.mocks.asyncconnection import AsyncConnectionMock
 from tests.mocks.eventbuilder import MockEventBuilder
@@ -16,13 +16,28 @@ class MockEvent:
 
 
 class TestEventProducer(TestCase):
-    def test_init_mapper(self):
+    def test_init(self):
         p = EventProducer("nap", "peilmerken", MagicMock())
         self.assertEqual("nap", p.mapper.mapping_definition.catalog)
         self.assertEqual("peilmerken", p.mapper.mapping_definition.collection)
 
+        self.assertEqual({
+            "catalog": "nap",
+            "collection": "peilmerken",
+        }, p.header_data)
+        self.assertEqual("nap.peilmerken", p.routing_key)
+
         p = EventProducer("some", "other", MagicMock())
         self.assertIsInstance(p.mapper, PassThroughEventDataMapper)
+
+    def test_init_rel_catalog(self):
+        p = EventProducer("rel", "nap_pmk_gbd_bbk_ligt_in_gebieden_bouwblok", MagicMock())
+        self.assertIsInstance(p.mapper, RelationEventDataMapper)
+        self.assertEqual({
+            "catalog": "nap",
+            "collection": "peilmerken_ligtInBouwblok",
+        }, p.header_data)
+        self.assertEqual("nap.rel.peilmerken_ligtInBouwblok", p.routing_key)
 
     def test_add_event(self):
         event = MagicMock()
@@ -51,8 +66,8 @@ class TestEventProducer(TestCase):
                     "event_type": "ACTION",
                     "event_id": "ID",
                     "tid": "TID",
-                    "catalog": "CAT",
-                    "collection": "COLL",
+                    "catalog": "cat",
+                    "collection": "coll",
                 },
                 "data": {
                     "tid": "TID",

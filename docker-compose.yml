@@ -9,13 +9,15 @@ services:
       MESSAGE_BROKER_ADDRESS: rabbitmq
       API_HOST: http://gobapi:8001
       GOB_SHARED_DIR: /app/shared
-      GOB_EVENTPRODUCER_DATABASE_HOST: eventproducer_database
+      GOB_EVENTPRODUCER_DATABASE_HOST: producer-database
       GOB_EVENTPRODUCER_DATABASE_PORT: 5432
       GOB_EVENTPRODUCER_DATABASE_USER: gob_eventproducer
       GOB_EVENTPRODUCER_DATABASE_PASSWORD: insecure
       GOB_EVENTPRODUCER_DATABASE: gob_eventproducer
       GOB_DATABASE_PORT_OVERRIDE: 5432
       GOB_DATABASE_HOST_OVERRIDE: database
+    depends_on:
+      - producer-database
 
     volumes:
       - gob-volume:/app/shared
@@ -23,10 +25,10 @@ services:
       - ${GOB_CORE_DIR-../GOB-Core}:/app/GOB-Core
       - ${GOB_CONFIG_DIR-../GOB-Config}:/app/GOB-Config
 
-  eventproducer_database:
+  producer-database:
     image: amsterdam/postgres11
     ports:
-      - "5430:5432"
+      - "5429:5432"
     environment:
       POSTGRES_PASSWORD: insecure
       POSTGRES_DB: gob_eventproducer
