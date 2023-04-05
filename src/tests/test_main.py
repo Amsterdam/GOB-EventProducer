@@ -73,6 +73,39 @@ class TestMain(TestCase):
         with self.assertRaises(AssertionError):
             event_produce_handler({})
 
+    @patch("gobeventproducer.__main__.logger")
+    @patch("gobeventproducer.__main__.EventProducer")
+    def test_event_produce_handler_full_load(self, mock_producer, mock_logger):
+        msg = {
+            "header": {
+                "catalogue": "CAT",
+                "collection": "COLL",
+                "mode": "full_load",
+            },
+        }
+        mock_producer.return_value.total_cnt = 14804
+
+        result = event_produce_handler(msg)
+        self.assertEqual(
+            {
+                "header": msg["header"],
+                "summary": {
+                    "produced": 14804,
+                },
+            },
+            result,
+        )
+
+        mock_producer.assert_has_calls(
+            [
+                call("CAT", "COLL", mock_logger),
+                call().produce_initial()
+            ]
+        )
+
+        with self.assertRaises(AssertionError):
+            event_produce_handler({})
+
     @patch("gobeventproducer.__main__.connect")
     @patch("gobeventproducer.__main__.MessagedrivenService")
     def test_main_entry(self, mock_messagedriven_service, mock_connect):

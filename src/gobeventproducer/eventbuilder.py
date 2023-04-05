@@ -6,19 +6,11 @@ from gobeventproducer import gob_model
 class EventDataBuilder:
     """Helper class that generates external event data."""
 
-    def __init__(self, gob_db_session, gob_db_base, catalogue: str, collection_name: str):
-        self.db_session = gob_db_session
-        base = gob_db_base
+    def __init__(self, catalogue_name: str, collection_name: str):
+        self.collection = gob_model[catalogue_name]["collections"][collection_name]
 
-        self.collection = gob_model[catalogue]["collections"][collection_name]
-        tablename = gob_model.get_table_name(catalogue, collection_name)
-        self.basetable = getattr(base.classes, tablename)
-
-    def build_event(self, tid: str) -> dict:
-        """Build event data for object with given tid."""
-        query = self.db_session.query(self.basetable).filter(self.basetable._tid == tid)
-        obj = query.one()
-
+    def build_event(self, obj: object) -> dict:
+        """Build event data for SQLAlchemy object."""
         result = {}
         for attr_name, attr in self.collection["attributes"].items():
             if "Reference" not in attr["type"]:

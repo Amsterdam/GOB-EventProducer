@@ -4,6 +4,22 @@ from unittest.mock import MagicMock, call, patch
 from gobeventproducer.database.gob.contextmanager import GobDatabaseConnection
 
 
+class MockComp:
+    asc = MagicMock()
+
+    def __init__(self, name):
+        self.name = name
+
+    def __eq__(self, other):
+        return f"{self.name} == {other}"
+
+    def __gt__(self, other):
+        return f"{self.name} > {other}"
+
+    def __le__(self, other):
+        return f"{self.name} <= {other}"
+
+
 class TestGobDatabaseConnection(TestCase):
     def test_context_manager(self):
         inst = GobDatabaseConnection("", "", MagicMock())
@@ -34,21 +50,6 @@ class TestGobDatabaseConnection(TestCase):
 
     @patch("gobeventproducer.database.gob.contextmanager.and_")
     def test_get_events(self, mock_and):
-        class MockComp:
-            asc = MagicMock()
-
-            def __init__(self, name):
-                self.name = name
-
-            def __eq__(self, other):
-                return f"{self.name} == {other}"
-
-            def __gt__(self, other):
-                return f"{self.name} > {other}"
-
-            def __le__(self, other):
-                return f"{self.name} <= {other}"
-
         gdc = GobDatabaseConnection("cat", "coll", MagicMock())
         gdc.Event = MagicMock()
         gdc.Event.catalogue = MockComp("catalogue")
@@ -77,19 +78,49 @@ class TestGobDatabaseConnection(TestCase):
             "eventid <= 200",
         )
 
+    def test_get_objects(self):
+        gdc = GobDatabaseConnection("cat", "coll", MagicMock())
+        gdc.session = MagicMock()
+
+        res = gdc.get_objects()
+
+        gdc.session.query.assert_has_calls([
+            call(gdc.ObjectTable),
+            call().yield_per(10_000),
+        ])
+        self.assertEqual(gdc.session.query().yield_per(), res)
+
+    def test_get_object(self):
+        gdc = GobDatabaseConnection("cat", "coll", MagicMock())
+        gdc.ObjectTable = MagicMock()
+        gdc.ObjectTable._tid = MockComp("_tid")
+        gdc.session = MagicMock()
+
+        res = gdc.get_object("24")
+
+        gdc.session.query.assert_has_calls([
+            call(gdc.ObjectTable),
+            call().filter("_tid == 24"),
+        ])
+        self.assertEqual(gdc.session.query().filter().one(), res)
+
+    @patch("gobeventproducer.database.gob.contextmanager.gob_model", spec_set=True)
     @patch("gobeventproducer.database.gob.contextmanager.MetaData")
     @patch("gobeventproducer.database.gob.contextmanager.create_engine")
     @patch("gobeventproducer.database.gob.contextmanager.Session")
     @patch("gobeventproducer.database.gob.contextmanager.URL")
     @patch("gobeventproducer.database.gob.contextmanager.automap_base")
     @patch("gobeventproducer.database.gob.contextmanager.GOB_DATABASE_CONFIG", {"db": "config"})
-    def test_connect(self, mock_automap, mock_url, mock_session, mock_create_engine, mock_metadata):
-        gdc = GobDatabaseConnection("", "", MagicMock())
-        gdc._get_tables_to_reflect = MagicMock(return_value=["events", "some_table"])
+    def test_connect(self, mock_automap, mock_url, mock_session, mock_create_engine, mock_metadata, mock_model):
+        mock_model.get_table_name = lambda x, y: f"{x}_{y}".lower()
+
+        gdc = GobDatabaseConnection("cat", "coll", MagicMock())
+        gdc._get_tables_to_reflect = MagicMock(return_value=["events", "cat_coll"])
 
         self.assertIsNone(gdc.session)
         self.assertIsNone(gdc.base)
         self.assertIsNone(gdc.Event)
+        self.assertIsNone(gdc.ObjectTable)
 
         gdc._connect()
 
@@ -101,6 +132,7 @@ class TestGobDatabaseConnection(TestCase):
 
         # Check that Event obj is mapped and set correctly
         self.assertEqual(mock_automap.return_value.classes.events, gdc.Event)
+        self.assertEqual(mock_automap.return_value.classes.cat_coll, gdc.ObjectTable)
         mock_automap.assert_has_calls(
             [
                 call(metadata=mock_metadata.return_value),
@@ -108,5 +140,5 @@ class TestGobDatabaseConnection(TestCase):
             ]
         )
         mock_metadata.assert_has_calls(
-            [call(), call().reflect(mock_create_engine.return_value, only=["events", "some_table"])]
+            [call(), call().reflect(mock_create_engine.return_value, only=["events", "cat_coll"])]
         )
