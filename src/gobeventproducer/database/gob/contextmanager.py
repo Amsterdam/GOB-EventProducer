@@ -12,13 +12,14 @@ from gobeventproducer.config import GOB_DATABASE_CONFIG
 
 
 class GobDatabaseConnection:
-    """Abstraction for getting events from the GOB DB."""
+    """Abstraction for getting data from the GOB DB."""
 
     def __init__(self, catalogue: str, collection: str, logger):
         self.catalogue = catalogue
         self.collection = collection
         self.logger = logger
         self.Event = None
+        self.ObjectTable = None
         self.base = None
         self.session = None
 
@@ -48,6 +49,8 @@ class GobDatabaseConnection:
         base = automap_base(metadata=meta)
         base.prepare()
         self.Event = base.classes.events
+        tablename = gob_model.get_table_name(self.catalogue, self.collection)
+        self.ObjectTable = getattr(base.classes, tablename)
         self.base = base
         self.logger.info("Initialised events storage")
 
@@ -64,7 +67,7 @@ class GobDatabaseConnection:
         """Return events between min_eventid (inclusive) and max_eventid (exclusive)."""
         return (
             self.session.query(self.Event)
-            .yield_per(10000)
+            .yield_per(10_000)
             .filter(
                 and_(
                     self.Event.catalogue == self.catalogue,
@@ -75,3 +78,11 @@ class GobDatabaseConnection:
             )
             .order_by(self.Event.eventid.asc())
         )
+
+    def get_objects(self):
+        """Get all objects for this table."""
+        return self.session.query(self.ObjectTable).yield_per(10_000)
+
+    def get_object(self, tid: str):
+        """Get full object for given tid."""
+        return self.session.query(self.ObjectTable).filter(self.ObjectTable._tid == tid).one()
