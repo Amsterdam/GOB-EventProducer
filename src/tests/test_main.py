@@ -80,7 +80,7 @@ class TestMain(TestCase):
             "header": {
                 "catalogue": "CAT",
                 "collection": "COLL",
-                "mode": "full_load",
+                "mode": "full",
             },
         }
         mock_producer.return_value.total_cnt = 14804
