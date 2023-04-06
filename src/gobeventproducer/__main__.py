@@ -43,7 +43,7 @@ def event_produce_handler(msg):
     event_producer = EventProducer(catalogue, collection, logger)
     mode = msg.get("header", {}).get("mode")
 
-    if mode == "full_load":
+    if mode == "full":
         logger.info("Produce full load events")
         event_producer.produce_initial()
     else:
