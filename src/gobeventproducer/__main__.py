@@ -19,7 +19,7 @@ def new_events_notification_handler(msg):
     """Handle new events notifications."""
     notification = get_notification(msg)
 
-    if notification.header.get("catalogue") not in LISTEN_TO_CATALOGS:
+    if notification.header.get("catalogue") not in [*LISTEN_TO_CATALOGS, "rel"]:
         return
 
     workflow = {"workflow_name": EVENT_PRODUCE}
@@ -35,16 +35,24 @@ def new_events_notification_handler(msg):
 
 def event_produce_handler(msg):
     """Handle event produce request message."""
-    logger.info("Produce Events")
-
     catalogue = msg.get("header", {}).get("catalogue")
     collection = msg.get("header", {}).get("collection")
 
     assert catalogue and collection, "Missing catalogue and collection in header"
 
-    min_eventid, max_eventid = msg["contents"]["last_event"]
     event_producer = EventProducer(catalogue, collection, logger)
-    event_producer.produce(min_eventid, max_eventid)
+    mode = msg.get("header", {}).get("mode")
+
+    if mode == "full":
+        logger.info("Produce full load events")
+        event_producer.produce_initial()
+    else:
+        logger.info("Produce Events")
+
+        assert "last_event" in msg["contents"], "Missing last_event in message contents"
+
+        min_eventid, max_eventid = msg["contents"]["last_event"]
+        event_producer.produce(min_eventid, max_eventid)
 
     return {
         "header": msg["header"],

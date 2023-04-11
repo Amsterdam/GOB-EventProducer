@@ -3,7 +3,7 @@ collection: peilmerken
 version: v1.0.1
 mapping:
   identificatie: identificatie
-  hoogteTovNap: hoogteTovNap
+  hoogte_tov_nap: hoogte_tov_nap
   jaar: jaar
   omschrijving: omschrijving
   windrichting: windrichting
