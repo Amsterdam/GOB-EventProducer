@@ -5,30 +5,28 @@ from gobeventproducer.__main__ import event_produce_handler, new_events_notifica
 
 
 class TestMain(TestCase):
+    @patch("gobeventproducer.__main__.LISTEN_TO_CATALOGS", ["nap"])
     @patch("gobeventproducer.__main__.get_notification")
     @patch("gobeventproducer.__main__.start_workflow")
     def test_new_events_notification_handler(self, mock_start_workflow, mock_get_notification):
         mock_get_notification.return_value = MagicMock()
         mock_get_notification.return_value.header = {
-            "catalogue": "CAT",
-            "collection": "COLL",
+            "catalogue": "nap",
+            "collection": "peilmerken",
             "application": "APPL",
             "process_id": "PID",
         }
-
         msg = MagicMock()
 
-        with patch("gobeventproducer.__main__.LISTEN_TO_CATALOGS", ["CAT"]):
-            new_events_notification_handler(msg)
+        new_events_notification_handler(msg)
         mock_get_notification.assert_called_with(msg)
-
         mock_start_workflow.assert_called_with(
             {
                 "workflow_name": "event_produce",
             },
             {
-                "catalogue": "CAT",
-                "collection": "COLL",
+                "catalogue": "nap",
+                "collection": "peilmerken",
                 "application": "APPL",
                 "process_id": "PID",
                 "contents": mock_get_notification.return_value.contents,
@@ -37,8 +35,38 @@ class TestMain(TestCase):
 
         # Ignore other catalogs
         mock_start_workflow.reset_mock()
+        mock_get_notification.return_value.header = {
+            "catalogue": "gebieden",
+            "collection": "bouwblokken",
+            "application": "APPL",
+            "process_id": "PID",
+        }
         new_events_notification_handler(msg)
         mock_start_workflow.assert_not_called()
+
+        # Should start workflow for relations from NAP
+        mock_start_workflow.reset_mock()
+        mock_get_notification.return_value.header = {
+            "catalogue": "rel",
+            "collection": "nap_pmk_gbd_bbk_ligt_in_gebieden_bouwblok",
+            "application": "APPL",
+            "process_id": "PID",
+        }
+        new_events_notification_handler(msg)
+        mock_start_workflow.assert_called_once()
+
+        # Should NOT start workflow for relations from gebieden
+        mock_start_workflow.reset_mock()
+        mock_get_notification.return_value.header = {
+            "catalogue": "rel",
+            "collection": "gbd_brt_brk_gme_ligt_in_brk_gemeente",
+            "application": "APPL",
+            "process_id": "PID",
+        }
+        new_events_notification_handler(msg)
+        mock_start_workflow.assert_not_called()
+        mock_start_workflow.reset_mock()
+
 
     @patch("gobeventproducer.__main__.logger")
     @patch("gobeventproducer.__main__.EventProducer")
