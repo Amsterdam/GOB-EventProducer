@@ -7,19 +7,35 @@ from gobcore.message_broker.config import (
     WORKFLOW_EXCHANGE,
 )
 from gobcore.message_broker.messagedriven_service import MessagedrivenService
-from gobcore.message_broker.notifications import get_notification, listen_to_notifications
+from gobcore.message_broker.notifications import EventNotification, get_notification, listen_to_notifications
+from gobcore.model.relations import get_catalog_collection_relation_name
 from gobcore.workflow.start_workflow import start_workflow
 
+from gobeventproducer import gob_model
 from gobeventproducer.config import LISTEN_TO_CATALOGS
 from gobeventproducer.database.local.connection import connect
 from gobeventproducer.producer import EventProducer
+
+
+def _listening_to_catalogue_collection(notification: EventNotification):
+    if notification.header.get("catalogue") in LISTEN_TO_CATALOGS:
+        return True
+
+    if notification.header.get("catalogue") == "rel":
+        collection_name = notification.header.get("collection")
+        main_catalog_name, *_ = get_catalog_collection_relation_name(gob_model, collection_name)
+
+        if main_catalog_name in LISTEN_TO_CATALOGS:
+            return True
+
+    return False
 
 
 def new_events_notification_handler(msg):
     """Handle new events notifications."""
     notification = get_notification(msg)
 
-    if notification.header.get("catalogue") not in [*LISTEN_TO_CATALOGS, "rel"]:
+    if not _listening_to_catalogue_collection(notification):
         return
 
     workflow = {"workflow_name": EVENT_PRODUCE}
