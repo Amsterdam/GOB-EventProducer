@@ -4,7 +4,7 @@ from typing import Union
 from gobcore.events.import_events import ADD
 from gobcore.message_broker.async_message_broker import AsyncConnection
 from gobcore.message_broker.config import CONNECTION_PARAMS, EVENTS_EXCHANGE
-from gobcore.model.relations import split_relation_table_name
+from gobcore.model.relations import get_catalog_collection_relation_name
 from more_itertools import peekable
 
 from gobeventproducer import gob_model
@@ -32,18 +32,9 @@ class EventProducer:
         self.relation_name = None
 
         if catalog == "rel":
-            rel_info = split_relation_table_name(f"rel_{collection_name}")
-
-            main_catalog, main_collection = gob_model.get_catalog_collection_from_abbr(
-                rel_info["src_cat_abbr"], rel_info["src_col_abbr"]
+            main_catalog_name, main_collection_name, relation_name = get_catalog_collection_relation_name(
+                gob_model, collection_name
             )
-            _, dst_collection = gob_model.get_catalog_collection_from_abbr(
-                rel_info["dst_cat_abbr"], rel_info["dst_col_abbr"]
-            )
-            relation_name = rel_info["reference_name"]
-
-            main_catalog_name = main_catalog["name"]
-            main_collection_name = main_collection["name"]
 
             main_mapping_definition = MappingDefinitionLoader().get(main_catalog_name, main_collection_name)
             main_mapper = (
