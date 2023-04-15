@@ -2,6 +2,7 @@ from unittest import TestCase
 from unittest.mock import MagicMock, call, patch
 
 from gobeventproducer.database.gob.contextmanager import GobDatabaseConnection
+from gobeventproducer.utils.relations import RelationInfo
 
 
 class MockComp:
@@ -19,7 +20,21 @@ class MockComp:
     def __le__(self, other):
         return f"{self.name} <= {other}"
 
+class MockRelationInfoBuilder:
+    @classmethod
+    def build(cls, catalogue: str, collection: str):
+        return {
+            "some_rel": RelationInfo(
+                relation_table_name="rel_table_for_some_rel",
+                dst_table_name="dst_table_1"
+            ),
+            "some_other_rel": RelationInfo(
+                relation_table_name="rel_table_for_some_other_rel",
+                dst_table_name="dst_table_1"
+            ),
+        }
 
+@patch("gobeventproducer.database.gob.contextmanager.RelationInfoBuilder", MockRelationInfoBuilder)
 class TestGobDatabaseConnection(TestCase):
     def test_context_manager(self):
         inst = GobDatabaseConnection("", "", MagicMock())
@@ -32,21 +47,18 @@ class TestGobDatabaseConnection(TestCase):
             inst._connect.assert_called_once()
         inst.session.commit.assert_called_once()
 
-    @patch("gobeventproducer.database.gob.contextmanager.get_relations_for_collection")
     @patch("gobeventproducer.database.gob.contextmanager.gob_model", spec_set=True)
-    def test_get_tables_to_reflect(self, mock_model, mock_get_relations):
-        mock_get_relations.return_value = {"rel a": "a", "rel b": "b"}
+    def test_get_tables_to_reflect(self, mock_model):
         gdc = GobDatabaseConnection("CAT", "COL", MagicMock())
         mock_model.get_table_name = lambda x, y: f"{x}_{y}".lower()
 
         expected = [
             "events",
             "cat_col",
-            "rel_a",
-            "rel_b",
+            "rel_table_for_some_rel",
+            "rel_table_for_some_other_rel",
         ]
         self.assertEqual(expected, gdc._get_tables_to_reflect())
-        mock_get_relations.assert_called_with(mock_model, "CAT", "COL")
 
     @patch("gobeventproducer.database.gob.contextmanager.and_")
     def test_get_events(self, mock_and):
@@ -78,31 +90,42 @@ class TestGobDatabaseConnection(TestCase):
             "eventid <= 200",
         )
 
+
+    @patch("gobeventproducer.database.gob.contextmanager.selectinload")
+    def test_query_object(self, mock_selectinload):
+        gdc = GobDatabaseConnection("cat", "coll", MagicMock())
+        gdc.ObjectTable = MagicMock()
+        gdc.session = MagicMock()
+        gdc.base = MagicMock()
+
+        res = gdc._query_object()
+
+        gdc.session.query.assert_has_calls([
+            call(gdc.ObjectTable),
+            call().options(mock_selectinload.return_value.selectinload.return_value, mock_selectinload.return_value.selectinload.return_value),
+            call().options().join(gdc.base.classes.rel_table_for_some_rel, isouter=True),
+            call().options().join().join(gdc.base.classes.rel_table_for_some_other_rel, isouter=True),
+        ])
+        self.assertEqual(gdc.session.query().options().join().join(), res)
+
     def test_get_objects(self):
         gdc = GobDatabaseConnection("cat", "coll", MagicMock())
-        gdc.session = MagicMock()
+        gdc._query_object = MagicMock()
 
         res = gdc.get_objects()
 
-        gdc.session.query.assert_has_calls([
-            call(gdc.ObjectTable),
-            call().yield_per(10_000),
-        ])
-        self.assertEqual(gdc.session.query().yield_per(), res)
+        gdc._query_object.return_value.yield_per.assert_called_with(10_000)
+        self.assertEqual(res, gdc._query_object.return_value.yield_per.return_value)
 
     def test_get_object(self):
         gdc = GobDatabaseConnection("cat", "coll", MagicMock())
+        gdc._query_object = MagicMock()
         gdc.ObjectTable = MagicMock()
         gdc.ObjectTable._tid = MockComp("_tid")
-        gdc.session = MagicMock()
 
         res = gdc.get_object("24")
-
-        gdc.session.query.assert_has_calls([
-            call(gdc.ObjectTable),
-            call().filter("_tid == 24"),
-        ])
-        self.assertEqual(gdc.session.query().filter().one(), res)
+        gdc._query_object.return_value.filter.assert_called_with("_tid == 24")
+        self.assertEqual(res, gdc._query_object.return_value.filter.return_value.one.return_value)
 
     @patch("gobeventproducer.database.gob.contextmanager.gob_model", spec_set=True)
     @patch("gobeventproducer.database.gob.contextmanager.MetaData")

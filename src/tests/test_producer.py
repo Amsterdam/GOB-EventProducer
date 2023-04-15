@@ -15,6 +15,14 @@ class MockEvent:
     def __eq__(self, other):
         return self.eventid == other.eventid
 
+class MockEventDatabuilder:
+
+    def __init__(self, *args):
+        pass
+
+    def build_event(self, obj: object):
+        fields = ["int", "some", "_gobid"]
+        return {field: getattr(obj, field) for field in fields}
 
 mock_model = {
     'cat': {
@@ -77,7 +85,7 @@ class TestEventProducer(TestCase):
             "ID",
             "TID",
             data,
-            EventDataBuilder('cat', 'coll')
+            MockEventDatabuilder()
         )
         self.assertEqual(result, {
             "header": {
@@ -102,6 +110,7 @@ class TestEventProducer(TestCase):
             }
         )
 
+    @patch("gobeventproducer.producer.EventDataBuilder", MockEventDatabuilder)
     @patch("gobeventproducer.producer.gob_model", mock_model)
     @patch("gobeventproducer.eventbuilder.gob_model", mock_model)
     @patch("gobeventproducer.producer.LocalDatabaseConnection")
@@ -179,6 +188,7 @@ class TestEventProducer(TestCase):
         p.produce(110, 200)
         p.logger.warning.assert_called_with("Have no previous produced events in database. Starting at beginning")
 
+    @patch("gobeventproducer.producer.EventDataBuilder", MockEventDatabuilder)
     @patch("gobeventproducer.producer.gob_model", mock_model)
     @patch("gobeventproducer.eventbuilder.gob_model", mock_model)
     @patch("gobeventproducer.producer.LocalDatabaseConnection")
