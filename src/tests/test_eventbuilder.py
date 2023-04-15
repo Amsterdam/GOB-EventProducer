@@ -5,30 +5,114 @@ from gobeventproducer.eventbuilder import EventDataBuilder
 
 
 class TestEventDataBuilder(TestCase):
-    mock_gobmodel_data = {"cat": {"collections": {"coll": {"attributes": {}}}}}
+    mock_gobmodel_data = {
+        'cat': {
+            'collections': {
+                'coll': {
+                    'attributes': {}
+                }
+            }
+        }
+    }
 
     @patch("gobeventproducer.eventbuilder.gob_model", spec_set=True)
-    def test_init(self, mock_model):
+    @patch("gobeventproducer.eventbuilder.RelationInfoBuilder")
+    def test_init(self, mock_relation_info_builder, mock_model):
         mock_model.__getitem__.return_value = self.mock_gobmodel_data["cat"]
-        edb = EventDataBuilder("cat", "coll")
-        self.assertEqual(self.mock_gobmodel_data["cat"]["collections"]["coll"], edb.collection)
+        edb = EventDataBuilder('cat', 'coll')
+
+        self.assertEqual(self.mock_gobmodel_data['cat']['collections']['coll'], edb.collection)
+        self.assertEqual(mock_relation_info_builder.build.return_value, edb.relations)
+        mock_relation_info_builder.build.assert_called_with('cat', 'coll')
 
     def test_build_event(self):
+        class RelationObject:
+            # Create mock relation for DbObject
+            def __init__(self, id, begin_geldigheid, eind_geldigheid, dst_name, dst_has_states):
+                self.begin_geldigheid = begin_geldigheid
+                self.eind_geldigheid = eind_geldigheid
+
+                dst_fields = {
+                    '_id': id,
+                    '_tid': id
+                }
+                if dst_has_states:
+                    dst_fields['volgnummer'] = 1
+
+                self.__setattr__(dst_name, type("DstTable", (), dst_fields))
+
         class DbObject:
             id = 42
-            identificatie = "identificatie"
+            _gobid = 43
+            identificatie = 'identificatie'
             ref_to_c = None
             manyref_to_c = None
             ref_to_d = None
             manyref_to_d = None
-            _gobid = 45
+            rel_tst_rta_tst_rtc_ref_to_c_collection = [
+                RelationObject('id1', 'begingeldigheid', None, 'test_catalogue_rel_test_entity_c', True),
+            ]
+            rel_tst_rta_tst_rtc_manyref_to_c_collection = [
+                RelationObject('id3', 'begingeldigheid', None, 'test_catalogue_rel_test_entity_c', True),
+                RelationObject('id4', 'begingeldigheid', 'eindgeldigheid', 'test_catalogue_rel_test_entity_c', True),
+            ]
+            rel_tst_rta_tst_rtd_ref_to_d_collection = [
+                RelationObject('id5', 'begingeldigheid', None, 'test_catalogue_rel_test_entity_d', False),
+            ]
+            rel_tst_rta_tst_rtd_manyref_to_d_collection = [
+                RelationObject('id7', 'begingeldigheid', None, 'test_catalogue_rel_test_entity_d', False),
+                RelationObject('id8', 'begingeldigheid', 'eindgeldigheid', 'test_catalogue_rel_test_entity_d', False),
+            ]
 
-        edb = EventDataBuilder("test_catalogue", "rel_test_entity_a")
+        edb = EventDataBuilder('test_catalogue', 'rel_test_entity_a')
 
         expected = {
-            "id": 42,
-            "_gobid": 45,
-            "identificatie": "identificatie",
+            'id': 42,
+            '_gobid': 43,
+            'identificatie': 'identificatie',
+            'manyref_to_c': [
+                {
+                    'begin_geldigheid': 'begingeldigheid',
+                    'eind_geldigheid': None,
+                    'id': 'id3',
+                    'tid': 'id3',
+                    'volgnummer': 1
+                },
+                {
+                    'begin_geldigheid': 'begingeldigheid',
+                    'eind_geldigheid': 'eindgeldigheid',
+                    'id': 'id4',
+                    'tid': 'id4',
+                    'volgnummer': 1
+                }
+            ],
+            'manyref_to_d': [
+                {
+                    'begin_geldigheid': 'begingeldigheid',
+                    'eind_geldigheid': None,
+                    'id': 'id7',
+                    'tid': 'id7'
+                },
+                {
+                    'begin_geldigheid': 'begingeldigheid',
+                    'eind_geldigheid': 'eindgeldigheid',
+                    'id': 'id8',
+                    'tid': 'id8'
+                }
+            ],
+            'ref_to_c': {
+                'begin_geldigheid': 'begingeldigheid',
+                'eind_geldigheid': None,
+                'id': 'id1',
+                'tid': 'id1',
+                'volgnummer': 1
+            },
+            'ref_to_d': {
+                'begin_geldigheid': 'begingeldigheid',
+                'eind_geldigheid': None,
+                'id': 'id5',
+                'tid': 'id5'
+            },
         }
 
         self.assertEqual(expected, edb.build_event(DbObject()))
