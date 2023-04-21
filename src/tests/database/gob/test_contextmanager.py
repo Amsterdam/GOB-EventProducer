@@ -110,12 +110,15 @@ class TestGobDatabaseConnection(TestCase):
 
     def test_get_objects(self):
         gdc = GobDatabaseConnection("cat", "coll", MagicMock())
+        gdc.ObjectTable = MagicMock()
+        gdc.ObjectTable._date_deleted = MockComp("_date_deleted")
         gdc._query_object = MagicMock()
 
         res = gdc.get_objects()
 
-        gdc._query_object.return_value.yield_per.assert_called_with(10_000)
-        self.assertEqual(res, gdc._query_object.return_value.yield_per.return_value)
+        gdc._query_object.return_value.filter.assert_called_with("_date_deleted == None")
+        gdc._query_object.return_value.filter.return_value.yield_per.assert_called_with(10_000)
+        self.assertEqual(res, gdc._query_object.return_value.filter.return_value.yield_per.return_value)
 
     def test_get_object(self):
         gdc = GobDatabaseConnection("cat", "coll", MagicMock())
