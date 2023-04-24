@@ -1,3 +1,4 @@
+from datetime import datetime
 from unittest import TestCase
 from unittest.mock import patch
 
@@ -9,7 +10,7 @@ class TestEventDataBuilder(TestCase):
         'cat': {
             'collections': {
                 'coll': {
-                    'attributes': {}
+                    'fields': {}
                 }
             }
         }
@@ -45,6 +46,10 @@ class TestEventDataBuilder(TestCase):
             id = 42
             _gobid = 43
             identificatie = 'identificatie'
+            volgnummer = 3
+            registratiedatum = '2020-01-01T00:00:00'
+            begin_geldigheid = '2020-01-01T09:00:00'
+            eind_geldigheid = None
             ref_to_c = None
             manyref_to_c = None
             ref_to_d = None
@@ -70,6 +75,10 @@ class TestEventDataBuilder(TestCase):
             'id': 42,
             '_gobid': 43,
             'identificatie': 'identificatie',
+            'volgnummer': 3,
+            'registratiedatum': datetime(2020, 1, 1, 0, 0),
+            'begin_geldigheid': datetime(2020, 1, 1, 9, 0),
+            'eind_geldigheid': None,
             'manyref_to_c': [
                 {
                     'begin_geldigheid': 'begingeldigheid',

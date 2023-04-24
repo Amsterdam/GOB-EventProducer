@@ -14,7 +14,7 @@ class EventDataBuilder:
     def build_event(self, obj: object) -> dict:
         """Build event data for SQLAlchemy object."""
         result = {}
-        for attr_name, attr in self.collection["attributes"].items():
+        for attr_name, attr in self.collection["fields"].items():
             if "Reference" in attr["type"]:
                 relation = self.relations[attr_name]
                 relation_table_rows = getattr(obj, f"{relation.relation_table_name}_collection")
