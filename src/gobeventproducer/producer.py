@@ -1,3 +1,4 @@
+import itertools
 import logging
 from typing import Union
 
@@ -16,6 +17,9 @@ from gobeventproducer.mapping import MappingDefinitionLoader
 from gobeventproducer.naming import camel_case
 
 logging.getLogger("eventproducer").setLevel(logging.WARNING)
+
+
+FULL_LOAD_BATCH_SIZE = 200
 
 
 class EventProducer:
@@ -64,7 +68,7 @@ class EventProducer:
             }
             self.routing_key = f"{catalog}.{collection_name}"
 
-    def _publish(self, event: dict, connection):
+    def _publish(self, event: Union[dict, list], connection):
         connection.publish(EVENTS_EXCHANGE, self.routing_key, event)
 
     def _build_event(self, event_action: str, event_id: Union[str, None], object_tid: str, data: object, event_builder):
@@ -136,19 +140,27 @@ class EventProducer:
 
             with AsyncConnection(CONNECTION_PARAMS) as rabbitconn:
                 last_eventid = None
-                for obj in objects:
-                    external_event = self._build_event(ADD.name, None, obj._tid, obj, event_builder)
 
-                    external_event["header"] |= {
-                        "full_load_sequence": True,
-                        "first_of_sequence": first_of_sequence,
-                        "last_of_sequence": False if objects.peek(None) else True,
-                    }
+                while chunk := itertools.islice(objects, FULL_LOAD_BATCH_SIZE):
+                    events_chunk = []
+                    for obj in chunk:
+                        external_event = self._build_event(ADD.name, None, obj._tid, obj, event_builder)
 
-                    self._publish(external_event, rabbitconn)
-                    self.total_cnt += 1
-                    last_eventid = obj._last_event if last_eventid is None else max(last_eventid, obj._last_event)
-                    first_of_sequence = False
+                        external_event["header"] |= {
+                            "full_load_sequence": True,
+                            "first_of_sequence": first_of_sequence,
+                            "last_of_sequence": False if objects.peek(None) else True,
+                        }
+
+                        events_chunk.append(external_event)
+                        first_of_sequence = False
+                        last_eventid = obj._last_event if last_eventid is None else max(last_eventid, obj._last_event)
+
+                    if len(events_chunk) == 0:
+                        break
+
+                    self._publish(events_chunk, rabbitconn)
+                    self.total_cnt += len(events_chunk)
                 localdb.set_last_eventid(last_eventid)
 
             self.logger.info(f"Produced {self.total_cnt} events.")

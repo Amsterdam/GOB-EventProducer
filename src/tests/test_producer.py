@@ -189,6 +189,7 @@ class TestEventProducer(TestCase):
         p.logger.warning.assert_called_with("Have no previous produced events in database. Starting at beginning")
 
     @patch("gobeventproducer.producer.EventDataBuilder", MockEventDatabuilder)
+    @patch("gobeventproducer.producer.FULL_LOAD_BATCH_SIZE", 2)
     @patch("gobeventproducer.producer.gob_model", mock_model)
     @patch("gobeventproducer.eventbuilder.gob_model", mock_model)
     @patch("gobeventproducer.producer.LocalDatabaseConnection")
@@ -217,7 +218,7 @@ class TestEventProducer(TestCase):
         p.produce_initial()
 
         rabbit_instance.publish.assert_has_calls([
-            call("gob.events", "cat.coll", {
+            call("gob.events", "cat.coll", [{
                 "header": {
                     "catalog": "cat",
                     "collection": "coll",
@@ -233,8 +234,7 @@ class TestEventProducer(TestCase):
                     "int": 8042,
                     "some": "data",
                 }
-            }),
-            call("gob.events", "cat.coll", {
+            }, {
                 "header": {
                     "catalog": "cat",
                     "collection": "coll",
@@ -250,8 +250,8 @@ class TestEventProducer(TestCase):
                     "int": 8042,
                     "some": "data",
                 }
-            }),
-            call("gob.events", "cat.coll", {
+            }]),
+            call("gob.events", "cat.coll", [{
                 "header": {
                     "catalog": "cat",
                     "collection": "coll",
@@ -267,7 +267,7 @@ class TestEventProducer(TestCase):
                     "int": 8042,
                     "some": "data",
                 }
-            }),
+            }]),
         ])
 
         localdb_instance.set_last_eventid.assert_called_once_with(24)
