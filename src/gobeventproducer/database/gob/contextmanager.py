@@ -87,11 +87,7 @@ class GobDatabaseConnection:
             )
             for relation in self.relations.values()
         ]
-        query = query.options(*options)
-
-        for relation in self.relations.values():
-            query = query.join(getattr(self.base.classes, relation.relation_table_name), isouter=True)
-        return query
+        return query.options(*options)
 
     def get_objects(self):
         """Get all objects for this table."""
