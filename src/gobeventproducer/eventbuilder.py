@@ -31,9 +31,11 @@ class EventDataBuilder:
                         rel["volgnummer"] = dst_table.volgnummer
 
                     relation_obj.append(rel)
-                result[attr_name] = (
-                    relation_obj[0] if len(relation_obj) > 0 and attr["type"] == "GOB.Reference" else relation_obj
-                )
+
+                if attr["type"] == "GOB.Reference":
+                    result[attr_name] = relation_obj[0] if len(relation_obj) > 0 else {}
+                else:
+                    result[attr_name] = relation_obj
             else:
                 # Skip relations
                 gob_type = get_gob_type_from_info(attr)
