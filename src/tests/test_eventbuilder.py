@@ -124,4 +124,28 @@ class TestEventDataBuilder(TestCase):
             },
         }
 
-        self.assertEqual(expected, edb.build_event(DbObject()))
+        dbobject = DbObject()
+
+        self.assertEqual(expected, edb.build_event(dbobject))
+
+        # Test empty relations
+        dbobject.rel_tst_rta_tst_rtc_ref_to_c_collection = []
+        dbobject.rel_tst_rta_tst_rtc_manyref_to_c_collection = []
+        dbobject.rel_tst_rta_tst_rtd_ref_to_d_collection = []
+        dbobject.rel_tst_rta_tst_rtd_manyref_to_d_collection = []
+
+        expected = {
+            'id': 42,
+            '_gobid': 43,
+            'identificatie': 'identificatie',
+            'volgnummer': 3,
+            'registratiedatum': datetime(2020, 1, 1, 0, 0),
+            'begin_geldigheid': datetime(2020, 1, 1, 9, 0),
+            'eind_geldigheid': None,
+            'manyref_to_c': [],
+            'manyref_to_d': [],
+            'ref_to_c': {},
+            'ref_to_d': {},
+        }
+
+        self.assertEqual(expected, edb.build_event(dbobject))
