@@ -103,10 +103,8 @@ class TestGobDatabaseConnection(TestCase):
         gdc.session.query.assert_has_calls([
             call(gdc.ObjectTable),
             call().options(mock_selectinload.return_value.selectinload.return_value, mock_selectinload.return_value.selectinload.return_value),
-            call().options().join(gdc.base.classes.rel_table_for_some_rel, isouter=True),
-            call().options().join().join(gdc.base.classes.rel_table_for_some_other_rel, isouter=True),
         ])
-        self.assertEqual(gdc.session.query().options().join().join(), res)
+        self.assertEqual(gdc.session.query().options(), res)
 
     def test_get_objects(self):
         gdc = GobDatabaseConnection("cat", "coll", MagicMock())
