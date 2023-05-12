@@ -1,7 +1,6 @@
 from unittest import TestCase
 from unittest.mock import MagicMock, call, patch
 
-from gobeventproducer.eventbuilder import EventDataBuilder
 from gobeventproducer.mapper import PassThroughEventDataMapper, RelationEventDataMapper
 from gobeventproducer.producer import EventProducer
 
@@ -64,7 +63,7 @@ class TestEventProducer(TestCase):
             "catalog": "nap",
             "collection": "peilmerken_ligtInBouwblok",
         }, p.header_data)
-        self.assertEqual("nap.rel.peilmerken_ligtInBouwblok", p.routing_key)
+        self.assertEqual("nap.peilmerken.rel.peilmerken_ligtInBouwblok", p.routing_key)
 
     @patch("gobeventproducer.producer.gob_model", mock_model)
     @patch("gobeventproducer.eventbuilder.gob_model", mock_model)

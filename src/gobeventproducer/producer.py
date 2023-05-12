@@ -56,8 +56,8 @@ class EventProducer:
                 "catalog": main_catalog_name,
                 "collection": event_collection_name,
             }
-            # e.g. nap.rel.peilmerken_ligtInBouwblok
-            self.routing_key = f"{main_catalog_name}.rel.{event_collection_name}"
+            # e.g. nap.peilmerken.rel.peilmerken_ligtInBouwblok
+            self.routing_key = f"{main_catalog_name}.{main_collection_name}.rel.{event_collection_name}"
 
         else:
             mapping_definition = MappingDefinitionLoader().get(self.catalog, self.collection)
