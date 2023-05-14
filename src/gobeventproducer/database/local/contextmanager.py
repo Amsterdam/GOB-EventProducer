@@ -1,3 +1,5 @@
+from typing import Optional
+
 from sqlalchemy import create_engine
 from sqlalchemy.engine.url import URL
 from sqlalchemy.orm import Session
@@ -13,7 +15,7 @@ class LocalDatabaseConnection:
         self.catalogue = catalogue
         self.collection = collection
         self.session = None
-        self.last_event = None
+        self.last_event: Optional[LastSentEvent] = None
 
     def _connect(self):
         engine = create_engine(URL(**DATABASE_CONFIG), connect_args={"sslmode": "require"})
@@ -27,7 +29,7 @@ class LocalDatabaseConnection:
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         """Exit context, commit last event to database."""
-        self.session.commit()
+        self.session.commit()  # type: ignore[attr-defined]
 
     def get_last_event(self) -> LastSentEvent:
         """Return the last event.
@@ -39,12 +41,14 @@ class LocalDatabaseConnection:
             return self.last_event
 
         self.last_event = (
-            self.session.query(LastSentEvent).filter_by(catalogue=self.catalogue, collection=self.collection).first()
+            self.session.query(LastSentEvent)  # type: ignore[attr-defined]
+            .filter_by(catalogue=self.catalogue, collection=self.collection)
+            .first()
         )
 
         if not self.last_event:
             self.last_event = LastSentEvent(catalogue=self.catalogue, collection=self.collection, last_event=-1)
-            self.session.add(self.last_event)
+            self.session.add(self.last_event)  # type: ignore[attr-defined]
 
         return self.last_event
 

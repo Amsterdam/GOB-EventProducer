@@ -42,7 +42,7 @@ class MappingDefinitionLoader:
 
     def _load(self):
         p = Path(__file__).parent
-        mapping_definitions = defaultdict(dict)
+        mapping_definitions: dict[str, dict[str, MappingDefinition]] = defaultdict(dict)
         for file in p.glob("**/*.yml"):
             mapping_definition = self._load_mapping_definition(file)
             mapping_definitions[mapping_definition.catalog][mapping_definition.collection] = mapping_definition
@@ -51,6 +51,6 @@ class MappingDefinitionLoader:
     def get(self, catalog: str, collection: str) -> Optional[MappingDefinition]:
         """Get the MappingDefinition for catalog/collection. Returns None if not exists."""
         try:
-            return self._mapping_definitions[catalog][collection]
+            return self._mapping_definitions[catalog][collection]  # type: ignore[index]
         except KeyError:
             return None

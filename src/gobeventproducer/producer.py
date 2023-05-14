@@ -1,6 +1,6 @@
 import logging
 from datetime import datetime
-from typing import Iterator
+from typing import Any, Iterator, Optional, Union
 
 from gobcore.events.import_events import ADD
 from gobcore.message_broker.async_message_broker import AsyncConnection
@@ -13,9 +13,15 @@ from gobeventproducer import gob_model
 from gobeventproducer.database.gob.contextmanager import GobDatabaseConnection
 from gobeventproducer.database.local.contextmanager import LocalDatabaseConnection
 from gobeventproducer.eventbuilder import EventDataBuilder
-from gobeventproducer.mapper import EventDataMapper, PassThroughEventDataMapper, RelationEventDataMapper
+from gobeventproducer.mapper import (
+    BaseEventDataMapper,
+    EventDataMapper,
+    PassThroughEventDataMapper,
+    RelationEventDataMapper,
+)
 from gobeventproducer.mapping import MappingDefinitionLoader
 from gobeventproducer.naming import camel_case
+from gobeventproducer.typing import EventData
 
 logging.getLogger("eventproducer").setLevel(logging.WARNING)
 
@@ -27,7 +33,7 @@ class BatchEventsMessagePublisher:
     """Publish events in batches using a context manager."""
 
     def __init__(self, rabbitconnection, routing_key: str, log_name: str, localdb: LocalDatabaseConnection):
-        self.events = []
+        self.events: list[EventData] = []
         self.routing_key = routing_key
         self.rabbitconnection = rabbitconnection
         self.cnt = 0
@@ -47,7 +53,7 @@ class BatchEventsMessagePublisher:
     def _log_cnt(self):
         print(f"{self.log_name}: {self.cnt}")
 
-    def add_event(self, event: dict):
+    def add_event(self, event: EventData):
         """Add event to batch."""
         self.events.append(event)
         self.cnt += 1
@@ -58,7 +64,7 @@ class BatchEventsMessagePublisher:
         if len(self.events) == MAX_EVENTS_PER_MESSAGE:
             self._flush()
 
-    def _publish(self, events: list):
+    def _publish(self, events: list[EventData]):
         self.rabbitconnection.publish(EVENTS_EXCHANGE, self.routing_key, events)
 
     def _flush(self):
@@ -80,6 +86,7 @@ class EventProducer:
         self.gob_db_base = None
         self.Event = None
         self.relation_name = None
+        self.mapper: Union[RelationEventDataMapper, BaseEventDataMapper]
 
         if catalog == "rel":
             main_catalog_name, main_collection_name, relation_name = get_catalog_collection_relation_name(
@@ -115,7 +122,9 @@ class EventProducer:
             }
             self.routing_key = f"{catalog}.{collection_name}"
 
-    def _build_event(self, event_action: str, event_id: int, object_tid: str, data: object, event_builder):
+    def _build_event(
+        self, event_action: str, event_id: int, object_tid: str, data: object, event_builder: EventDataBuilder
+    ) -> EventData:
         header = {
             **self.header_data,
             "event_type": event_action,
@@ -126,9 +135,9 @@ class EventProducer:
         data = event_builder.build_event(data)
         transformed_data = self.mapper.map(data)
 
-        return {"header": header, "data": transformed_data}
+        return {"header": header, "data": transformed_data}  # type: ignore[return-value]
 
-    def _produce(self, events: Iterator):
+    def _produce(self, events: Iterator[EventData]):
         with AsyncConnection(CONNECTION_PARAMS) as rabbitconn, LocalDatabaseConnection(
             self.catalog, self.collection
         ) as localdb:
@@ -141,7 +150,7 @@ class EventProducer:
                 self.logger.info(f"Produced {batch_builder.cnt} events.")
                 return batch_builder.cnt
 
-    def _generate_by_eventids(self, min_eventid: int, max_eventid: int = None):
+    def _generate_by_eventids(self, min_eventid: int, max_eventid: Optional[int] = None):
         event_builder = EventDataBuilder(self.catalog, self.collection)
         with GobDatabaseConnection(self.catalog, self.collection, self.logger) as gobdb:
             current_max_id = None
@@ -161,7 +170,7 @@ class EventProducer:
 
                 start_eventid = current_max_id
 
-    def produce(self, min_eventid: int = None, max_eventid: int = None):
+    def produce(self, min_eventid: Optional[int] = None, max_eventid: Optional[int] = None):
         """Produce external events starting from min_eventid (exclusive) until max_eventid (inclusive)."""
         start_eventid = min_eventid
 
@@ -187,7 +196,7 @@ class EventProducer:
         max_msg = f" and <= {max_eventid}" if max_eventid is not None else ""
         self.logger.info(f"Start producing events {start_msg}{max_msg}")
 
-        return self._produce(self._generate_by_eventids(start_eventid, max_eventid))
+        return self._produce(self._generate_by_eventids(start_eventid, max_eventid))  # type: ignore[arg-type]
 
     def produce_initial(self):
         """Produce external ADD events for the current state of the database.
@@ -203,7 +212,7 @@ class EventProducer:
                 f"Start generating ADD events for current database state " f"using routing key {self.routing_key}"
             )
 
-            def event_generator(objects_: list):
+            def event_generator(objects_: "peekable[Any]"):
                 first_of_sequence = True
                 for obj in objects_:
                     external_event = self._build_event(ADD.name, obj._last_event, obj._tid, obj, event_builder)

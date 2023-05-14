@@ -1,6 +1,7 @@
 from gobcore.typesystem import get_gob_type_from_info
 
 from gobeventproducer import gob_model
+from gobeventproducer.typing import EventData
 from gobeventproducer.utils.relations import RelationInfoBuilder
 
 
@@ -11,9 +12,9 @@ class EventDataBuilder:
         self.collection = gob_model[catalogue_name]["collections"][collection_name]
         self.relations = RelationInfoBuilder.build(catalogue_name, collection_name)
 
-    def build_event(self, obj: object) -> dict:  # noqa: C901
+    def build_event(self, obj: object) -> EventData:  # noqa: C901
         """Build event data for SQLAlchemy object."""
-        result = {}
+        result: EventData = {}  # type: ignore[assignment]
         for attr_name, attr in self.collection["fields"].items():
             attr_name_or_alias = attr.get("shortname", attr_name)
             if "Reference" in attr["type"]:

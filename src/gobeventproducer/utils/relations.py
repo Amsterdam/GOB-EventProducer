@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 
-from gobcore.model.relations import get_relations_for_collection, split_relation_table_name  # type: ignore
+from gobcore.model.relations import get_relations_for_collection, split_relation_table_name
 
 from gobeventproducer import gob_model
 

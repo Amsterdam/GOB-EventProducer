@@ -1,9 +1,10 @@
 import warnings
+from typing import Optional
 
 from sqlalchemy import MetaData, and_, create_engine
 from sqlalchemy import exc as sa_exc
 from sqlalchemy.engine.url import URL
-from sqlalchemy.ext.automap import automap_base
+from sqlalchemy.ext.automap import AutomapBase, automap_base
 from sqlalchemy.orm import Session, selectinload
 
 from gobeventproducer import gob_model
@@ -20,8 +21,8 @@ class GobDatabaseConnection:
         self.logger = logger
         self.Event = None
         self.ObjectTable = None
-        self.base = None
-        self.session = None
+        self.base: Optional[AutomapBase] = None
+        self.session: Optional[Session] = None
         self.relations = RelationInfoBuilder.build(catalogue, collection)
 
     def _get_tables_to_reflect(self):
@@ -60,34 +61,37 @@ class GobDatabaseConnection:
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         """Exit context, commit any uncommitted changes."""
-        self.session.commit()
+        self.session.commit()  # type: ignore[union-attr]
 
-    def get_events(self, min_eventid: int, max_eventid: int = None, limit: int = None):
+    def get_events(self, min_eventid: int, max_eventid: Optional[int] = None, limit: Optional[int] = None):
         """Return events between min_eventid (inclusive) and max_eventid (exclusive)."""
         and_filter = [
-            self.Event.catalogue == self.catalogue,
-            self.Event.entity == self.collection,
-            self.Event.eventid > min_eventid,
+            self.Event.catalogue == self.catalogue,  # type: ignore[attr-defined]
+            self.Event.entity == self.collection,  # type: ignore[attr-defined]
+            self.Event.eventid > min_eventid,  # type: ignore[attr-defined]
         ]
         if max_eventid is not None:
-            and_filter.append(self.Event.eventid <= max_eventid)
+            and_filter.append(self.Event.eventid <= max_eventid)  # type: ignore[attr-defined]
 
         query = (
-            self.session.query(self.Event)
+            self.session.query(self.Event)  # type: ignore[union-attr]
             .yield_per(10_000)
             .filter(and_(*and_filter))
-            .order_by(self.Event.eventid.asc())
+            .order_by(self.Event.eventid.asc())  # type: ignore[attr-defined]
         )
         if limit is not None:
             query = query.limit(limit)
         return query
 
     def _query_object(self):
-        query = self.session.query(self.ObjectTable)
+        query = self.session.query(self.ObjectTable)  # type: ignore[union-attr]
         options = [
             # Eager load relation tables and dst table
             selectinload(getattr(self.ObjectTable, f"{relation.relation_table_name}_collection")).selectinload(
-                getattr(getattr(self.base.classes, relation.relation_table_name), relation.dst_table_name)
+                getattr(
+                    getattr(self.base.classes, relation.relation_table_name),  # type: ignore[union-attr]
+                    relation.dst_table_name,
+                )
             )
             for relation in self.relations.values()
         ]
@@ -97,11 +101,11 @@ class GobDatabaseConnection:
         """Get all objects for this table."""
         return (
             self._query_object()
-            .filter(self.ObjectTable._date_deleted == None)  # noqa: E711
-            .order_by(self.ObjectTable._last_event.asc())
+            .filter(self.ObjectTable._date_deleted == None)  # type: ignore[attr-defined] # noqa: E711
+            .order_by(self.ObjectTable._last_event.asc())  # type: ignore[attr-defined]
             .yield_per(5_000)
         )
 
     def get_object(self, tid: str):
         """Get full object for given tid."""
-        return self._query_object().filter(self.ObjectTable._tid == tid).one()
+        return self._query_object().filter(self.ObjectTable._tid == tid).one()  # type: ignore[attr-defined]

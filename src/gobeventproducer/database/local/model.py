@@ -1,10 +1,11 @@
 from sqlalchemy import Column, Integer, String
-from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.orm import declarative_base
 
 Base = declarative_base()
 
 
-class LastSentEvent(Base):
+# https://docs.sqlalchemy.org/en/14/orm/extensions/mypy.html
+class LastSentEvent(Base):  # type: ignore[valid-type, misc]
     """Holds the last event ID that is sent for the given catalog/collection."""
 
     __tablename__ = "last_sent_events"

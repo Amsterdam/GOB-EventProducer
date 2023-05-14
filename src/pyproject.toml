@@ -81,7 +81,12 @@ warn_return_any = true
 
 # Disable import checks for non typed packages
 [[tool.mypy.overrides]]
-module = ["pika.*"]
+module = ["sqlalchemy.*"]
+ignore_missing_imports = true
+
+# Disable import checks for gobcore package
+[[tool.mypy.overrides]]
+module = ["gobcore.*"]
 ignore_missing_imports = true
 
 [tool.pytest.ini_options]

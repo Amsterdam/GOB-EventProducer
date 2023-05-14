@@ -1,7 +1,7 @@
 import alembic.config
 import alembic.script
 from alembic.runtime import migration
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, text
 from sqlalchemy.engine.url import URL
 from sqlalchemy.exc import DBAPIError
 from sqlalchemy.orm import Session
@@ -77,7 +77,7 @@ def is_connected():
         return False
     else:
         try:
-            session.execute("SELECT 1")
+            session.execute(text("SELECT 1"))
             return True
         except Exception:
             return False
@@ -102,13 +102,13 @@ def migrate_storage(force_migrate):
     if not force_migrate:
         # Don't force
         # Nicely wait for any migrations to finish before continuing
-        engine.execute(f"SELECT pg_advisory_lock({MIGRATION_LOCK})")
+        engine.execute(f"SELECT pg_advisory_lock({MIGRATION_LOCK})")  # type: ignore[union-attr]
 
     try:
         # Check if storage is up-to-date
         alembic_cfg = alembic.config.Config("alembic.ini")
         script = alembic.script.ScriptDirectory.from_config(alembic_cfg)
-        with engine.begin() as conn:
+        with engine.begin() as conn:  # type: ignore[union-attr]
             context = migration.MigrationContext.configure(conn)
             up_to_date = context.get_current_revision() == script.get_current_head()
 
@@ -126,4 +126,4 @@ def migrate_storage(force_migrate):
         print("Storage is up-to-date")
 
     # Always unlock
-    engine.execute(f"SELECT pg_advisory_unlock({MIGRATION_LOCK})")
+    engine.execute(f"SELECT pg_advisory_unlock({MIGRATION_LOCK})")  # type: ignore[union-attr]
