@@ -91,7 +91,7 @@ class GobDatabaseConnection:
 
     def get_objects(self):
         """Get all objects for this table."""
-        return self._query_object().filter(self.ObjectTable._date_deleted == None).yield_per(10_000)  # noqa: E711
+        return self._query_object().filter(self.ObjectTable._date_deleted == None).yield_per(5_000)  # noqa: E711
 
     def get_object(self, tid: str):
         """Get full object for given tid."""
