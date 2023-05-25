@@ -149,3 +149,26 @@ class TestEventDataBuilder(TestCase):
         }
 
         self.assertEqual(expected, edb.build_event(dbobject))
+
+    @patch("gobeventproducer.eventbuilder.gob_model", spec_set=True)
+    @patch("gobeventproducer.eventbuilder.RelationInfoBuilder")
+    def test_build_event_shortname(self, mock_builder, mock_model):
+        mock_model.__getitem__.return_value = self.mock_gobmodel_data["cat"]
+        edb = EventDataBuilder('cat', 'coll')
+        edb.collection["fields"] = {
+            "some_long_attribute_name": {
+                "type": "GOB.String",
+                "description": "some description",
+                "shortname": "shortened_attr"
+            }
+        }
+
+        expected = {
+            "shortened_attr": "the value",
+            "_gobid": 42
+        }
+        class Object:
+            some_long_attribute_name = "the value"
+            _gobid = 42
+
+        self.assertEqual(expected, edb.build_event(Object()))
