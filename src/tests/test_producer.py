@@ -65,6 +65,15 @@ class TestEventProducer(TestCase):
         }, p.header_data)
         self.assertEqual("nap.peilmerken.rel.peilmerken_ligtInBouwblok", p.routing_key)
 
+    def test_init_compressed_name(self):
+        p = EventProducer("rel", "brk2_akt_brk2_kot__hft_btrk_op_brk_kot_", MagicMock())
+        self.assertIsInstance(p.mapper, RelationEventDataMapper)
+        self.assertEqual({
+            "catalog": "brk2",
+            "collection": "aantekeningenkadastraleobjecten_heeftBetrekkingOpBrkKadastraalObject",
+        }, p.header_data)
+        self.assertEqual("brk2.aantekeningenkadastraleobjecten.rel.aantekeningenkadastraleobjecten_heeftBetrekkingOpBrkKadastraalObject", p.routing_key)
+
     @patch("gobeventproducer.producer.gob_model", mock_model)
     @patch("gobeventproducer.eventbuilder.gob_model", mock_model)
     def test_build_event(self):

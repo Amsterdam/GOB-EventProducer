@@ -5,6 +5,7 @@ from typing import Union
 from gobcore.events.import_events import ADD
 from gobcore.message_broker.async_message_broker import AsyncConnection
 from gobcore.message_broker.config import CONNECTION_PARAMS, EVENTS_EXCHANGE
+from gobcore.model.name_compressor import NameCompressor
 from gobcore.model.relations import get_catalog_collection_relation_name
 from more_itertools import peekable
 
@@ -44,6 +45,7 @@ class EventProducer:
             main_mapper = (
                 EventDataMapper(main_mapping_definition) if main_mapping_definition else PassThroughEventDataMapper()
             )
+            relation_name = NameCompressor.uncompress_name(relation_name)
             relation_name = main_mapper.get_mapped_name_reverse(relation_name)
             event_collection_name = f"{main_collection_name}_{camel_case(relation_name)}"
 
