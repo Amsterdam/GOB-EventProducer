@@ -15,6 +15,7 @@ class EventDataBuilder:
         """Build event data for SQLAlchemy object."""
         result = {}
         for attr_name, attr in self.collection["fields"].items():
+            attr_name_or_alias = attr.get("shortname", attr_name)
             if "Reference" in attr["type"]:
                 relation = self.relations[attr_name]
                 relation_table_rows = getattr(obj, f"{relation.relation_table_name}_collection")
@@ -33,13 +34,13 @@ class EventDataBuilder:
                     relation_obj.append(rel)
 
                 if attr["type"] == "GOB.Reference":
-                    result[attr_name] = relation_obj[0] if len(relation_obj) > 0 else {}
+                    result[attr_name_or_alias] = relation_obj[0] if len(relation_obj) > 0 else {}
                 else:
-                    result[attr_name] = relation_obj
+                    result[attr_name_or_alias] = relation_obj
             else:
                 # Skip relations
                 gob_type = get_gob_type_from_info(attr)
                 type_instance = gob_type.from_value(getattr(obj, attr_name))
-                result[attr_name] = type_instance.to_value
+                result[attr_name_or_alias] = type_instance.to_value
         result["_gobid"] = getattr(obj, "_gobid")
         return result
