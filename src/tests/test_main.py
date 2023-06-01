@@ -78,7 +78,7 @@ class TestMain(TestCase):
             },
             "contents": {"last_event": [100, 204]},
         }
-        mock_producer.return_value.total_cnt = 14804
+        mock_producer.return_value.produce.return_value = 14804
 
         result = event_produce_handler(msg)
         self.assertEqual(
@@ -111,7 +111,7 @@ class TestMain(TestCase):
                 "mode": "full",
             },
         }
-        mock_producer.return_value.total_cnt = 14804
+        mock_producer.return_value.produce_initial.return_value = 14804
 
         result = event_produce_handler(msg)
         self.assertEqual(
