@@ -22,8 +22,8 @@ services:
     volumes:
       - gob-volume:/app/shared
       - ./src/gobeventproducer:/app/gobeventproducer
-      - ${GOB_CORE_DIR-../GOB-Core}:/app/GOB-Core
-      - ${GOB_CONFIG_DIR-../GOB-Config}:/app/GOB-Config
+      - ${GOB_CORE_DIR-../GOB-Core}:/app/src/gobcore
+      - ${GOB_CONFIG_DIR-../GOB-Config}:/app/src/gobconfig
 
   producer-database:
     image: amsterdam/postgres11

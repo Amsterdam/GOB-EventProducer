@@ -23,6 +23,29 @@ logging.getLogger("eventproducer").setLevel(logging.WARNING)
 FULL_LOAD_BATCH_SIZE = 200
 
 
+class Counter:
+    """Simple counter for logging purposes. Logs a line every 10_000 or log_per increments."""
+
+    def __init__(self, name: str, log_per: int = 10_000):
+        self.name = name
+        self.cnt = 0
+        self.log_per = log_per
+
+    def __enter__(self):
+        """Enter context."""
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        """Exit context."""
+        pass
+
+    def increment(self):
+        """Increment counter and log if needed."""
+        self.cnt += 1
+        if self.cnt % self.log_per == 0:
+            print(f"{self.name}: {self.cnt}")
+
+
 class EventProducer:
     """Produce events for external consumers."""
 
@@ -31,7 +54,6 @@ class EventProducer:
         self.collection = collection_name
         self.logger = logger
         self.gob_db_session = None
-        self.total_cnt = 0
         self.gob_db_base = None
         self.Event = None
         self.relation_name = None
@@ -113,7 +135,9 @@ class EventProducer:
 
             events = gobdb.get_events(start_eventid, max_eventid)
 
-            with AsyncConnection(CONNECTION_PARAMS) as rabbitconn:
+            with AsyncConnection(CONNECTION_PARAMS) as rabbitconn, Counter(
+                f"{self.catalog} {self.collection}"
+            ) as counter:
                 for event in events:
                     obj = gobdb.get_object(event.tid)
                     external_event = self._build_event(event.action, event.eventid, event.tid, obj, event_builder)
@@ -121,9 +145,10 @@ class EventProducer:
 
                     gobdb.session.expunge(event)
                     localdb.set_last_eventid(event.eventid)
-                    self.total_cnt += 1
+                    counter.increment()
 
-            self.logger.info(f"Produced {self.total_cnt} events.")
+                self.logger.info(f"Produced {counter.cnt} events.")
+                return counter.cnt
 
     def produce_initial(self):
         """Produce external ADD events for the current state of the database.
@@ -140,7 +165,9 @@ class EventProducer:
 
             self.logger.info("Start generating ADD events for current database state")
 
-            with AsyncConnection(CONNECTION_PARAMS) as rabbitconn:
+            with AsyncConnection(CONNECTION_PARAMS) as rabbitconn, Counter(
+                f"{self.catalog} {self.collection}"
+            ) as counter:
                 last_eventid = None
 
                 while chunk := itertools.islice(objects, FULL_LOAD_BATCH_SIZE):
@@ -157,12 +184,14 @@ class EventProducer:
                         events_chunk.append(external_event)
                         first_of_sequence = False
                         last_eventid = obj._last_event if last_eventid is None else max(last_eventid, obj._last_event)
+                        counter.increment()
 
                     if len(events_chunk) == 0:
                         break
 
                     self._publish(events_chunk, rabbitconn)
-                    self.total_cnt += len(events_chunk)
+
                 localdb.set_last_eventid(last_eventid)
 
-            self.logger.info(f"Produced {self.total_cnt} events.")
+                self.logger.info(f"Produced {counter.cnt} events.")
+                return counter.cnt
