@@ -2,7 +2,7 @@ from unittest import TestCase
 from unittest.mock import MagicMock, call, patch
 
 from gobeventproducer.mapper import PassThroughEventDataMapper, RelationEventDataMapper
-from gobeventproducer.producer import EventProducer
+from gobeventproducer.producer import EventProducer, Counter
 
 
 class MockEvent:
@@ -39,6 +39,20 @@ mock_model = {
         }
     }
 }
+
+class TestCounter(TestCase):
+
+    @patch("builtins.print")
+    def test_counter(self, mock_print):
+        counter = Counter("my counter", 2)
+
+        for i in range(5):
+            counter.increment()
+
+        mock_print.assert_has_calls([
+            call("my counter: 2"),
+            call("my counter: 4"),
+        ])
 
 
 class TestEventProducer(TestCase):

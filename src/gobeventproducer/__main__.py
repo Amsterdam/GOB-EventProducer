@@ -61,19 +61,19 @@ def event_produce_handler(msg):
 
     if mode == "full":
         logger.info("Produce full load events")
-        event_producer.produce_initial()
+        produced_cnt = event_producer.produce_initial()
     else:
         logger.info("Produce Events")
 
         assert "last_event" in msg["contents"], "Missing last_event in message contents"
 
         min_eventid, max_eventid = msg["contents"]["last_event"]
-        event_producer.produce(min_eventid, max_eventid)
+        produced_cnt = event_producer.produce(min_eventid, max_eventid)
 
     return {
         "header": msg["header"],
         "summary": {
-            "produced": event_producer.total_cnt,
+            "produced": produced_cnt,
         },
     }
 
