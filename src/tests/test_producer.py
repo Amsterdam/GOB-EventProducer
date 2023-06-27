@@ -1,3 +1,4 @@
+from freezegun import freeze_time
 from unittest import TestCase
 from unittest.mock import MagicMock, call, patch
 
@@ -55,6 +56,7 @@ class TestCounter(TestCase):
         ])
 
 
+@freeze_time("2023-06-27 00:00:00")
 class TestEventProducer(TestCase):
     def test_init(self):
         p = EventProducer("nap", "peilmerken", MagicMock())
@@ -116,6 +118,7 @@ class TestEventProducer(TestCase):
                 "tid": "TID",
                 "catalog": "cat",
                 "collection": "coll",
+                "generated_timestamp": "2023-06-27T00:00:00",
             },
             "data": {
                 "transformed": True,
@@ -170,6 +173,7 @@ class TestEventProducer(TestCase):
                     "event_type": "ADD",
                     "event_id": 24,
                     "tid": 200,
+                    "generated_timestamp": "2023-06-27T00:00:00",
                 },
                 "data": {
                     "_gobid": 200,
@@ -184,6 +188,7 @@ class TestEventProducer(TestCase):
                     "event_type": "MODIFY",
                     "event_id": 25,
                     "tid": 201,
+                    "generated_timestamp": "2023-06-27T00:00:00",
                 },
                 "data": {
                     "_gobid": 201,
@@ -250,6 +255,7 @@ class TestEventProducer(TestCase):
                     "full_load_sequence": True,
                     "first_of_sequence": True,
                     "last_of_sequence": False,
+                    "generated_timestamp": "2023-06-27T00:00:00",
                 },
                 "data": {
                     "_gobid": 19,
@@ -266,6 +272,7 @@ class TestEventProducer(TestCase):
                     "full_load_sequence": True,
                     "first_of_sequence": False,
                     "last_of_sequence": False,
+                    "generated_timestamp": "2023-06-27T00:00:00",
                 },
                 "data": {
                     "_gobid": 22,
@@ -283,6 +290,7 @@ class TestEventProducer(TestCase):
                     "full_load_sequence": True,
                     "first_of_sequence": False,
                     "last_of_sequence": True,
+                    "generated_timestamp": "2023-06-27T00:00:00",
                 },
                 "data": {
                     "_gobid": 24,
