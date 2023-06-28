@@ -1,5 +1,6 @@
 import itertools
 import logging
+from datetime import datetime
 from typing import Union
 
 from gobcore.events.import_events import ADD
@@ -101,6 +102,7 @@ class EventProducer:
             "event_type": event_action,
             "event_id": event_id,
             "tid": object_tid,
+            "generated_timestamp": datetime.now().isoformat(),
         }
         data = event_builder.build_event(data)
         transformed_data = self.mapper.map(data)
