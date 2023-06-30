@@ -1,0 +1,19 @@
+catalog: brk
+collection: tenaamstellingen
+version: v2.2.1
+mapping:
+  neuron_id: id
+  identificatie: identificatie
+  volgnummer: volgnummer
+  van_kadastraalsubject: van_kadastraalsubject
+  begin_geldigheid: begin_geldigheid
+  eind_geldigheid: einde_geldigheid
+  aandeel: aandeel
+  geldt_voor: geldt_voor
+  burgerlijke_staat_ten_tijde_van_verkrijging: burgerlijke_staat_ten_tijde_van_verkrijging
+  verkregen_namens_samenwerkingsverband: verkregen_namens_samenwerkingsverband
+  in_onderzoek: in_onderzoek
+  van_zakelijkrecht: van_zakelijkrecht
+  is_gebaseerd_op_stukdeel: is_gebaseerd_op_stukdeel
+  toestandsdatum: toestandsdatum
+
