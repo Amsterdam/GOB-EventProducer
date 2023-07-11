@@ -22,6 +22,9 @@ class RelationInfoBuilder:
         result = {}
 
         for attr_name, relname in get_relations_for_collection(gob_model, catalogue_name, collection_name).items():
+            if relname is None:
+                # Relation is not (yet) defined in GOB
+                continue
             rel_table_name = gob_model.get_table_name("rel", relname)
             result[attr_name] = RelationInfo(
                 relation_table_name=rel_table_name, dst_table_name=cls._get_rel_dst_tablename(rel_table_name)
