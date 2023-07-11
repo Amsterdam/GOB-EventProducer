@@ -11,12 +11,14 @@ class EventDataBuilder:
         self.collection = gob_model[catalogue_name]["collections"][collection_name]
         self.relations = RelationInfoBuilder.build(catalogue_name, collection_name)
 
-    def build_event(self, obj: object) -> dict:
+    def build_event(self, obj: object) -> dict:  # noqa: C901
         """Build event data for SQLAlchemy object."""
         result = {}
         for attr_name, attr in self.collection["fields"].items():
             attr_name_or_alias = attr.get("shortname", attr_name)
             if "Reference" in attr["type"]:
+                if attr_name not in self.relations:
+                    continue
                 relation = self.relations[attr_name]
                 relation_table_rows = getattr(obj, f"{relation.relation_table_name}_collection")
                 relation_obj = []
