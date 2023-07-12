@@ -17,23 +17,23 @@ class EventDataBuilder:
         for attr_name, attr in self.collection["fields"].items():
             attr_name_or_alias = attr.get("shortname", attr_name)
             if "Reference" in attr["type"]:
-                if attr_name not in self.relations:
-                    continue
-                relation = self.relations[attr_name]
-                relation_table_rows = getattr(obj, f"{relation.relation_table_name}_collection")
                 relation_obj = []
-                for row in relation_table_rows:
-                    dst_table = getattr(row, relation.dst_table_name)
-                    rel = {
-                        "tid": dst_table._tid,
-                        "id": dst_table._id,
-                        "begin_geldigheid": str(row.begin_geldigheid) if row.begin_geldigheid else None,
-                        "eind_geldigheid": str(row.eind_geldigheid) if row.eind_geldigheid else None,
-                    }
-                    if hasattr(dst_table, "volgnummer"):
-                        rel["volgnummer"] = dst_table.volgnummer
 
-                    relation_obj.append(rel)
+                if relation := self.relations.get(attr_name):
+                    relation_table_rows = getattr(obj, f"{relation.relation_table_name}_collection")
+
+                    for row in relation_table_rows:
+                        dst_table = getattr(row, relation.dst_table_name)
+                        rel = {
+                            "tid": dst_table._tid,
+                            "id": dst_table._id,
+                            "begin_geldigheid": str(row.begin_geldigheid) if row.begin_geldigheid else None,
+                            "eind_geldigheid": str(row.eind_geldigheid) if row.eind_geldigheid else None,
+                        }
+                        if hasattr(dst_table, "volgnummer"):
+                            rel["volgnummer"] = dst_table.volgnummer
+
+                        relation_obj.append(rel)
 
                 if attr["type"] == "GOB.Reference":
                     result[attr_name_or_alias] = relation_obj[0] if len(relation_obj) > 0 else {}
