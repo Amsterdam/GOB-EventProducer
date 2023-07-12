@@ -150,11 +150,10 @@ class TestEventDataBuilder(TestCase):
 
         self.assertEqual(expected, edb.build_event(dbobject))
 
-        # Test that a missing relation is ignored
+        # Test that a missing relation is added as empty relation
         del edb.relations['manyref_to_c']
 
-        res = edb.build_event(dbobject)
-        self.assertTrue('manyref_to_c' not in res)
+        self.assertEqual(expected, edb.build_event(dbobject))
 
     @patch("gobeventproducer.eventbuilder.gob_model", spec_set=True)
     @patch("gobeventproducer.eventbuilder.RelationInfoBuilder")
