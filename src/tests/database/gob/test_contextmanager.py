@@ -115,8 +115,9 @@ class TestGobDatabaseConnection(TestCase):
         res = gdc.get_objects()
 
         gdc._query_object.return_value.filter.assert_called_with("_date_deleted == None")
-        gdc._query_object.return_value.filter.return_value.yield_per.assert_called_with(5_000)
-        self.assertEqual(res, gdc._query_object.return_value.filter.return_value.yield_per.return_value)
+        gdc._query_object.return_value.filter.return_value.order_by.assert_called_with(gdc.ObjectTable._last_event.asc.return_value)
+        gdc._query_object.return_value.filter.return_value.order_by.return_value.yield_per.assert_called_with(5_000)
+        self.assertEqual(res, gdc._query_object.return_value.filter.return_value.order_by.return_value.yield_per.return_value)
 
     def test_get_object(self):
         gdc = GobDatabaseConnection("cat", "coll", MagicMock())
