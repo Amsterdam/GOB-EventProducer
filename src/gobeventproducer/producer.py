@@ -133,7 +133,9 @@ class EventProducer:
                 start_eventid = last_eventid
 
             start_msg = "from beginning" if start_eventid == -1 else f"> {start_eventid}"
-            self.logger.info(f"Start producing events {start_msg} and <= {max_eventid}")
+            self.logger.info(
+                f"Start producing events {start_msg} and <= {max_eventid} " f"using routing key {self.routing_key}"
+            )
 
             events = gobdb.get_events(start_eventid, max_eventid)
 
@@ -155,8 +157,8 @@ class EventProducer:
     def produce_initial(self):
         """Produce external ADD events for the current state of the database.
 
-        Adds the 'full_load' property to the header and 'finished': True to the last event of the sequence so that the
-        consumer knows when the full_load is finished (and a table can be replaced, for example).
+        Adds the 'full_load_sequence' property to the header, along with 'first_of_sequence' and 'last_of_sequence'.
+        This is the mechanism that communicates to the consumer that a full load is in progress
         """
         with LocalDatabaseConnection(self.catalog, self.collection) as localdb, GobDatabaseConnection(
             self.catalog, self.collection, self.logger
@@ -165,7 +167,9 @@ class EventProducer:
             objects = peekable(gobdb.get_objects())
             first_of_sequence = True
 
-            self.logger.info("Start generating ADD events for current database state")
+            self.logger.info(
+                f"Start generating ADD events for current database state " f"using routing key {self.routing_key}"
+            )
 
             with AsyncConnection(CONNECTION_PARAMS) as rabbitconn, Counter(
                 f"{self.catalog} {self.collection}"
