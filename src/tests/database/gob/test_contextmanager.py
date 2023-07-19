@@ -90,6 +90,18 @@ class TestGobDatabaseConnection(TestCase):
             "eventid <= 200",
         )
 
+        res = gdc.get_events(104, 248, 50)
+        gdc.session.query.assert_has_calls(
+            [
+                call(gdc.Event),
+                call().yield_per(10000),
+                call().yield_per().filter(mock_and.return_value),
+                call().yield_per().filter().order_by(gdc.Event.eventid.asc.return_value),
+                call().yield_per().filter().order_by().limit(50)
+            ]
+        )
+
+        self.assertEqual(gdc.session.query().yield_per().filter().order_by().limit(), res)
 
     @patch("gobeventproducer.database.gob.contextmanager.selectinload")
     def test_query_object(self, mock_selectinload):
