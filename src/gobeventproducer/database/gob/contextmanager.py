@@ -62,18 +62,19 @@ class GobDatabaseConnection:
         """Exit context, commit any uncommitted changes."""
         self.session.commit()
 
-    def get_events(self, min_eventid: int, max_eventid: int, limit: int = None):
+    def get_events(self, min_eventid: int, max_eventid: int = None, limit: int = None):
         """Return events between min_eventid (inclusive) and max_eventid (exclusive)."""
+        and_filter = [
+            self.Event.catalogue == self.catalogue,
+            self.Event.entity == self.collection,
+            self.Event.eventid > min_eventid,
+        ]
+        if max_eventid is not None:
+            and_filter.append(self.Event.eventid <= max_eventid)
+
         query = self.session.query(self.Event)\
             .yield_per(10_000)\
-            .filter(
-                and_(
-                    self.Event.catalogue == self.catalogue,
-                    self.Event.entity == self.collection,
-                    self.Event.eventid > min_eventid,
-                    self.Event.eventid <= max_eventid,
-                )
-            )\
+            .filter(and_(*and_filter))\
             .order_by(self.Event.eventid.asc())
         if limit is not None:
             query = query.limit(limit)

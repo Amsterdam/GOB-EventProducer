@@ -103,6 +103,15 @@ class TestGobDatabaseConnection(TestCase):
 
         self.assertEqual(gdc.session.query().yield_per().filter().order_by().limit(), res)
 
+        # Check no max set
+        gdc.get_events(824)
+        mock_and.assert_called_with(
+            "catalogue == cat",
+            "entity == coll",
+            "eventid > 824",
+        )
+
+
     @patch("gobeventproducer.database.gob.contextmanager.selectinload")
     def test_query_object(self, mock_selectinload):
         gdc = GobDatabaseConnection("cat", "coll", MagicMock())
