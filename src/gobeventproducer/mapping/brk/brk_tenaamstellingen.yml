@@ -7,7 +7,7 @@ mapping:
   volgnummer: volgnummer
   van_kadastraalsubject: van_kadastraalsubject
   begin_geldigheid: begin_geldigheid
-  eind_geldigheid: einde_geldigheid
+  eind_geldigheid: eind_geldigheid
   aandeel: aandeel
   geldt_voor: geldt_voor
   burgerlijke_staat_ten_tijde_van_verkrijging: burgerlijke_staat_ten_tijde_van_verkrijging
