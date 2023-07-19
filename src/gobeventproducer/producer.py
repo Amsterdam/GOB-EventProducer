@@ -1,7 +1,6 @@
-import itertools
 import logging
 from datetime import datetime
-from typing import Union
+from typing import Iterator
 
 from gobcore.events.import_events import ADD
 from gobcore.message_broker.async_message_broker import AsyncConnection
@@ -21,16 +20,20 @@ from gobeventproducer.naming import camel_case
 logging.getLogger("eventproducer").setLevel(logging.WARNING)
 
 
-FULL_LOAD_BATCH_SIZE = 200
+MAX_EVENTS_PER_MESSAGE = 200
 
 
-class Counter:
-    """Simple counter for logging purposes. Logs a line every 10_000 or log_per increments."""
+class BatchEventsMessagePublisher:
+    """Publish events in batches using a context manager."""
 
-    def __init__(self, name: str, log_per: int = 10_000):
-        self.name = name
+    def __init__(self, rabbitconnection, routing_key: str, log_name: str, localdb: LocalDatabaseConnection):
+        self.events = []
+        self.routing_key = routing_key
+        self.rabbitconnection = rabbitconnection
         self.cnt = 0
-        self.log_per = log_per
+        self.log_name = log_name
+        self.log_per = 10_000
+        self.localdb = localdb
 
     def __enter__(self):
         """Enter context."""
@@ -38,13 +41,27 @@ class Counter:
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         """Exit context."""
-        pass
+        self._flush()
 
-    def increment(self):
-        """Increment counter and log if needed."""
-        self.cnt += 1
+    def add_event(self, event: dict):
+        """Add event to batch."""
+        self.events.append(event)
+
         if self.cnt % self.log_per == 0:
-            print(f"{self.name}: {self.cnt}")
+            print(f"{self.log_name}: {self.cnt}")
+
+        if len(self.events) == MAX_EVENTS_PER_MESSAGE:
+            self._flush()
+
+    def _publish(self, events: list):
+        self.rabbitconnection.publish(EVENTS_EXCHANGE, self.routing_key, events)
+
+    def _flush(self):
+        if self.events:
+            self._publish(self.events)
+            self.localdb.set_last_eventid(self.events[-1]["header"]["event_id"])
+
+            self.events = []
 
 
 class EventProducer:
@@ -93,10 +110,7 @@ class EventProducer:
             }
             self.routing_key = f"{catalog}.{collection_name}"
 
-    def _publish(self, event: Union[dict, list], connection):
-        connection.publish(EVENTS_EXCHANGE, self.routing_key, event)
-
-    def _build_event(self, event_action: str, event_id: Union[str, None], object_tid: str, data: object, event_builder):
+    def _build_event(self, event_action: str, event_id: int, object_tid: str, data: object, event_builder):
         header = {
             **self.header_data,
             "event_type": event_action,
@@ -109,50 +123,66 @@ class EventProducer:
 
         return {"header": header, "data": transformed_data}
 
-    def produce(self, min_eventid: int, max_eventid: int):
+    def _produce(self, events: Iterator):
+        with AsyncConnection(CONNECTION_PARAMS) as rabbitconn, LocalDatabaseConnection(
+            self.catalog, self.collection
+        ) as localdb:
+            with BatchEventsMessagePublisher(
+                rabbitconn, self.routing_key, f"{self.catalog} {self.collection}", localdb
+            ) as batch_builder:
+                for event in events:
+                    batch_builder.add_event(event)
+
+                self.logger.info(f"Produced {batch_builder.cnt} events.")
+                return batch_builder.cnt
+
+    def _generate_by_eventids(self, min_eventid: int, max_eventid: int = None):
+        event_builder = EventDataBuilder(self.catalog, self.collection)
+        with GobDatabaseConnection(self.catalog, self.collection, self.logger) as gobdb:
+            current_max_id = None
+            start_eventid = min_eventid
+            while True:
+                events_ = gobdb.get_events(start_eventid, max_eventid, MAX_EVENTS_PER_MESSAGE)
+
+                for event_ in events_:
+                    obj = gobdb.get_object(event_.tid)
+                    external_event = self._build_event(event_.action, event_.eventid, event_.tid, obj, event_builder)
+                    yield external_event
+                    current_max_id = event_.eventid
+                    gobdb.session.expunge(event_)
+
+                if current_max_id is None or current_max_id == start_eventid:
+                    break
+
+                start_eventid = current_max_id
+
+    def produce(self, min_eventid: int = None, max_eventid: int = None):
         """Produce external events starting from min_eventid (exclusive) until max_eventid (inclusive)."""
         start_eventid = min_eventid
 
-        with LocalDatabaseConnection(self.catalog, self.collection) as localdb, GobDatabaseConnection(
-            self.catalog, self.collection, self.logger
-        ) as gobdb:
+        with LocalDatabaseConnection(self.catalog, self.collection) as localdb:
             last_eventid = localdb.get_last_eventid()
 
-            event_builder = EventDataBuilder(self.catalog, self.collection)
+        if min_eventid is None:
+            self.logger.info(f"No min_eventid specified. Starting from last_eventid ({last_eventid})")
+            start_eventid = last_eventid
+        # Ideally we would remove the need for the database. We keep the database in place now to be able to spot
+        # any errors thay may arise when min_eventid does not match the expected last_eventid.
+        elif last_eventid != min_eventid:
+            if last_eventid == -1:
+                self.logger.warning("Have no previous produced events in database. Starting from beginning")
+            else:
+                self.logger.warning(
+                    f"Min eventid ({min_eventid}) to produce does not match last_eventid "
+                    f"({last_eventid}) in database. Recovering."
+                )
+            start_eventid = last_eventid
 
-            # Ideally we would remove the need for the database. We keep the database in place now to be able to spot
-            # any errors thay may arise when min_eventid does not match the expected last_eventid.
-            if last_eventid != min_eventid:
-                if last_eventid == -1:
-                    self.logger.warning("Have no previous produced events in database. Starting at beginning")
-                else:
-                    self.logger.warning(
-                        f"Min eventid ({min_eventid}) to produce does not match last_eventid "
-                        f"({last_eventid}) in database. Recovering."
-                    )
-                start_eventid = last_eventid
+        start_msg = "from beginning" if start_eventid == -1 else f"> {start_eventid}"
+        max_msg = " and <= {max_eventid}" if max_eventid is not None else ""
+        self.logger.info(f"Start producing events {start_msg}{max_msg}")
 
-            start_msg = "from beginning" if start_eventid == -1 else f"> {start_eventid}"
-            self.logger.info(
-                f"Start producing events {start_msg} and <= {max_eventid} " f"using routing key {self.routing_key}"
-            )
-
-            events = gobdb.get_events(start_eventid, max_eventid)
-
-            with AsyncConnection(CONNECTION_PARAMS) as rabbitconn, Counter(
-                f"{self.catalog} {self.collection}"
-            ) as counter:
-                for event in events:
-                    obj = gobdb.get_object(event.tid)
-                    external_event = self._build_event(event.action, event.eventid, event.tid, obj, event_builder)
-                    self._publish(external_event, rabbitconn)
-
-                    gobdb.session.expunge(event)
-                    localdb.set_last_eventid(event.eventid)
-                    counter.increment()
-
-                self.logger.info(f"Produced {counter.cnt} events.")
-                return counter.cnt
+        return self._produce(self._generate_by_eventids(start_eventid, max_eventid))
 
     def produce_initial(self):
         """Produce external ADD events for the current state of the database.
@@ -160,44 +190,25 @@ class EventProducer:
         Adds the 'full_load_sequence' property to the header, along with 'first_of_sequence' and 'last_of_sequence'.
         This is the mechanism that communicates to the consumer that a full load is in progress
         """
-        with LocalDatabaseConnection(self.catalog, self.collection) as localdb, GobDatabaseConnection(
-            self.catalog, self.collection, self.logger
-        ) as gobdb:
+        with GobDatabaseConnection(self.catalog, self.collection, self.logger) as gobdb:
             event_builder = EventDataBuilder(self.catalog, self.collection)
             objects = peekable(gobdb.get_objects())
-            first_of_sequence = True
 
             self.logger.info(
                 f"Start generating ADD events for current database state " f"using routing key {self.routing_key}"
             )
 
-            with AsyncConnection(CONNECTION_PARAMS) as rabbitconn, Counter(
-                f"{self.catalog} {self.collection}"
-            ) as counter:
-                last_eventid = None
+            def event_generator(objects_: list):
+                first_of_sequence = True
+                for obj in objects_:
+                    external_event = self._build_event(ADD.name, obj._last_event, obj._tid, obj, event_builder)
 
-                while chunk := itertools.islice(objects, FULL_LOAD_BATCH_SIZE):
-                    events_chunk = []
-                    for obj in chunk:
-                        external_event = self._build_event(ADD.name, None, obj._tid, obj, event_builder)
+                    external_event["header"] |= {
+                        "full_load_sequence": True,
+                        "first_of_sequence": first_of_sequence,
+                        "last_of_sequence": False if objects.peek(None) else True,
+                    }
+                    first_of_sequence = False
+                    yield external_event
 
-                        external_event["header"] |= {
-                            "full_load_sequence": True,
-                            "first_of_sequence": first_of_sequence,
-                            "last_of_sequence": False if objects.peek(None) else True,
-                        }
-
-                        events_chunk.append(external_event)
-                        first_of_sequence = False
-                        last_eventid = obj._last_event if last_eventid is None else max(last_eventid, obj._last_event)
-                        counter.increment()
-
-                    if len(events_chunk) == 0:
-                        break
-
-                    self._publish(events_chunk, rabbitconn)
-
-                localdb.set_last_eventid(last_eventid)
-
-                self.logger.info(f"Produced {counter.cnt} events.")
-                return counter.cnt
+            return self._produce(event_generator(objects))

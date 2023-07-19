@@ -3,7 +3,7 @@ from unittest import TestCase
 from unittest.mock import MagicMock, call, patch
 
 from gobeventproducer.mapper import PassThroughEventDataMapper, RelationEventDataMapper
-from gobeventproducer.producer import EventProducer, Counter
+from gobeventproducer.producer import EventProducer
 
 
 class MockEvent:
@@ -40,20 +40,6 @@ mock_model = {
         }
     }
 }
-
-class TestCounter(TestCase):
-
-    @patch("builtins.print")
-    def test_counter(self, mock_print):
-        counter = Counter("my counter", 2)
-
-        for i in range(5):
-            counter.increment()
-
-        mock_print.assert_has_calls([
-            call("my counter: 2"),
-            call("my counter: 4"),
-        ])
 
 
 @freeze_time("2023-06-27 00:00:00")
@@ -146,11 +132,12 @@ class TestEventProducer(TestCase):
         localdb_instance = mock_localdb.return_value.__enter__.return_value
         gobdb_instance = mock_gobdb.return_value.__enter__.return_value
 
-        mock_events = [
-            MockEvent(24, "ADD", 200),
-            MockEvent(25, "MODIFY", 201)
-        ]
-        gobdb_instance.get_events = MagicMock(return_value=mock_events)
+        mock_events = iter([
+            [MockEvent(101, "ADD", 200)],
+            [MockEvent(105, "MODIFY", 201)],
+            []
+        ])
+        gobdb_instance.get_events = MagicMock(side_effect=mock_events)
         gobdb_instance.get_object = MagicMock(side_effect=lambda tid: type('DbObject', (), {
             "some": "data",
             "int": 8042,
@@ -163,15 +150,19 @@ class TestEventProducer(TestCase):
 
         p.produce(100, 200)
 
-        gobdb_instance.get_events.assert_called_with(100, 200)
+        gobdb_instance.get_events.assert_has_calls([
+            call(100, 200, 200),
+            call(101, 200, 200),
+            call(105, 200, 200),
+        ])
 
         rabbit_instance.publish.assert_has_calls([
-            call("gob.events", "cat.coll", {
+            call("gob.events", "cat.coll", [{
                 "header": {
                     "catalog": "cat",
                     "collection": "coll",
                     "event_type": "ADD",
-                    "event_id": 24,
+                    "event_id": 101,
                     "tid": 200,
                     "generated_timestamp": "2023-06-27T00:00:00",
                 },
@@ -180,13 +171,12 @@ class TestEventProducer(TestCase):
                     "int": 8042,
                     "some": "data",
                 }
-            }),
-            call("gob.events", "cat.coll", {
+            }, {
                 "header": {
                     "catalog": "cat",
                     "collection": "coll",
                     "event_type": "MODIFY",
-                    "event_id": 25,
+                    "event_id": 105,
                     "tid": 201,
                     "generated_timestamp": "2023-06-27T00:00:00",
                 },
@@ -195,15 +185,16 @@ class TestEventProducer(TestCase):
                     "int": 8042,
                     "some": "data",
                 }
-            }),
+            }]),
         ])
 
         gobdb_instance.get_object.assert_has_calls([call(event.tid) for event in mock_events])
         gobdb_instance.session.expunge.assert_has_calls([call(event) for event in mock_events])
-        localdb_instance.set_last_eventid.assert_has_calls([call(24), call(25)])
+        localdb_instance.set_last_eventid.assert_has_calls([call(105)])
         p.logger.warning.assert_not_called()
 
         # min_eventid does not match start_event
+        gobdb_instance.get_events = MagicMock(side_effect=iter([[]]))
         p.produce(110, 200)
         p.logger.warning.assert_called_with(
             "Min eventid (110) to produce does not match last_eventid (100) in database. Recovering."
@@ -211,12 +202,22 @@ class TestEventProducer(TestCase):
 
         # Test with no last event in database
         localdb_instance.get_last_eventid.return_value = -1
+        gobdb_instance.get_events = MagicMock(return_value=[])
 
         p.produce(110, 200)
-        p.logger.warning.assert_called_with("Have no previous produced events in database. Starting at beginning")
+        p.logger.warning.assert_called_with("Have no previous produced events in database. Starting from beginning")
+        gobdb_instance.get_events.assert_called_with(-1, 200, 200)
+
+        gobdb_instance.get_events = MagicMock(return_value=[])
+        localdb_instance.get_last_eventid.return_value = 100
+
+        # Test no min/max
+        p.produce()
+        p.logger.info.assert_any_call("No min_eventid specified. Starting from last_eventid (100)")
+        gobdb_instance.get_events.assert_called_with(100, None, 200)
 
     @patch("gobeventproducer.producer.EventDataBuilder", MockEventDatabuilder)
-    @patch("gobeventproducer.producer.FULL_LOAD_BATCH_SIZE", 2)
+    @patch("gobeventproducer.producer.MAX_EVENTS_PER_MESSAGE", 2)
     @patch("gobeventproducer.producer.gob_model", mock_model)
     @patch("gobeventproducer.eventbuilder.gob_model", mock_model)
     @patch("gobeventproducer.producer.LocalDatabaseConnection")
@@ -250,7 +251,7 @@ class TestEventProducer(TestCase):
                     "catalog": "cat",
                     "collection": "coll",
                     "event_type": "ADD",
-                    "event_id": None,
+                    "event_id": 19,
                     "tid": "19",
                     "full_load_sequence": True,
                     "first_of_sequence": True,
@@ -267,7 +268,7 @@ class TestEventProducer(TestCase):
                     "catalog": "cat",
                     "collection": "coll",
                     "event_type": "ADD",
-                    "event_id": None,
+                    "event_id": 22,
                     "tid": "22",
                     "full_load_sequence": True,
                     "first_of_sequence": False,
@@ -285,7 +286,7 @@ class TestEventProducer(TestCase):
                     "catalog": "cat",
                     "collection": "coll",
                     "event_type": "ADD",
-                    "event_id": None,
+                    "event_id": 24,
                     "tid": "24",
                     "full_load_sequence": True,
                     "first_of_sequence": False,
@@ -300,4 +301,7 @@ class TestEventProducer(TestCase):
             }]),
         ])
 
-        localdb_instance.set_last_eventid.assert_called_once_with(24)
+        localdb_instance.set_last_eventid.assert_has_calls([
+            call(22),
+            call(24),
+        ])

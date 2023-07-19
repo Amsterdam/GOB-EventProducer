@@ -72,10 +72,12 @@ class GobDatabaseConnection:
         if max_eventid is not None:
             and_filter.append(self.Event.eventid <= max_eventid)
 
-        query = self.session.query(self.Event)\
-            .yield_per(10_000)\
-            .filter(and_(*and_filter))\
+        query = (
+            self.session.query(self.Event)
+            .yield_per(10_000)
+            .filter(and_(*and_filter))
             .order_by(self.Event.eventid.asc())
+        )
         if limit is not None:
             query = query.limit(limit)
         return query
