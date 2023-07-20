@@ -65,9 +65,7 @@ def event_produce_handler(msg):
     else:
         logger.info("Produce Events")
 
-        assert "last_event" in msg["contents"], "Missing last_event in message contents"
-
-        min_eventid, max_eventid = msg["contents"]["last_event"]
+        min_eventid, max_eventid = msg.get("contents", {}).get("last_event", (None, None))
         produced_cnt = event_producer.produce(min_eventid, max_eventid)
 
     return {
