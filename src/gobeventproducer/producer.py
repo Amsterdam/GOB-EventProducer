@@ -179,7 +179,7 @@ class EventProducer:
             start_eventid = last_eventid
 
         start_msg = "from beginning" if start_eventid == -1 else f"> {start_eventid}"
-        max_msg = " and <= {max_eventid}" if max_eventid is not None else ""
+        max_msg = f" and <= {max_eventid}" if max_eventid is not None else ""
         self.logger.info(f"Start producing events {start_msg}{max_msg}")
 
         return self._produce(self._generate_by_eventids(start_eventid, max_eventid))
