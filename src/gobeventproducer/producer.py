@@ -46,6 +46,7 @@ class BatchEventsMessagePublisher:
     def add_event(self, event: dict):
         """Add event to batch."""
         self.events.append(event)
+        self.cnt += 1
 
         if self.cnt % self.log_per == 0:
             print(f"{self.log_name}: {self.cnt}")
