@@ -42,6 +42,10 @@ class BatchEventsMessagePublisher:
     def __exit__(self, exc_type, exc_val, exc_tb):
         """Exit context."""
         self._flush()
+        self._log_cnt()
+
+    def _log_cnt(self):
+        print(f"{self.log_name}: {self.cnt}")
 
     def add_event(self, event: dict):
         """Add event to batch."""
@@ -49,7 +53,7 @@ class BatchEventsMessagePublisher:
         self.cnt += 1
 
         if self.cnt % self.log_per == 0:
-            print(f"{self.log_name}: {self.cnt}")
+            self._log_cnt()
 
         if len(self.events) == MAX_EVENTS_PER_MESSAGE:
             self._flush()

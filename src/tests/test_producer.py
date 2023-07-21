@@ -3,7 +3,7 @@ from unittest import TestCase
 from unittest.mock import MagicMock, call, patch
 
 from gobeventproducer.mapper import PassThroughEventDataMapper, RelationEventDataMapper
-from gobeventproducer.producer import EventProducer
+from gobeventproducer.producer import EventProducer, BatchEventsMessagePublisher
 
 
 class MockEvent:
@@ -41,6 +41,43 @@ mock_model = {
     }
 }
 
+class TestBatchEventsMessagePublisher(TestCase):
+
+    @patch("gobeventproducer.producer.MAX_EVENTS_PER_MESSAGE", 3)
+    @patch("builtins.print")
+    def test_add_event(self, mock_print):
+        rabbitcon = MagicMock()
+        localdb = MagicMock()
+        events = [{
+            "header": {
+                "event_id": n,
+            }
+        } for n in range(7)]
+
+        with BatchEventsMessagePublisher(rabbitcon, "some.routing.key", "LogName", localdb) as publisher:
+            publisher.log_per = 2
+
+            for event in events:
+                publisher.add_event(event)
+
+        mock_print.assert_has_calls([
+            call("LogName: 2"),
+            call("LogName: 4"),
+            call("LogName: 6"),
+            call("LogName: 7"),
+        ])
+
+        rabbitcon.publish.assert_has_calls([
+            call("gob.events", "some.routing.key", events[:3]),
+            call("gob.events", "some.routing.key", events[3:6]),
+            call("gob.events", "some.routing.key", events[6:]),
+        ])
+
+        localdb.set_last_eventid.assert_has_calls([
+            call(2),
+            call(5),
+            call(6),
+        ])
 
 @freeze_time("2023-06-27 00:00:00")
 class TestEventProducer(TestCase):
