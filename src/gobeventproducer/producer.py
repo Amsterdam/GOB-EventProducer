@@ -42,13 +42,18 @@ class BatchEventsMessagePublisher:
     def __exit__(self, exc_type, exc_val, exc_tb):
         """Exit context."""
         self._flush()
+        self._log_cnt()
+
+    def _log_cnt(self):
+        print(f"{self.log_name}: {self.cnt}")
 
     def add_event(self, event: dict):
         """Add event to batch."""
         self.events.append(event)
+        self.cnt += 1
 
         if self.cnt % self.log_per == 0:
-            print(f"{self.log_name}: {self.cnt}")
+            self._log_cnt()
 
         if len(self.events) == MAX_EVENTS_PER_MESSAGE:
             self._flush()
@@ -179,7 +184,7 @@ class EventProducer:
             start_eventid = last_eventid
 
         start_msg = "from beginning" if start_eventid == -1 else f"> {start_eventid}"
-        max_msg = " and <= {max_eventid}" if max_eventid is not None else ""
+        max_msg = f" and <= {max_eventid}" if max_eventid is not None else ""
         self.logger.info(f"Start producing events {start_msg}{max_msg}")
 
         return self._produce(self._generate_by_eventids(start_eventid, max_eventid))
