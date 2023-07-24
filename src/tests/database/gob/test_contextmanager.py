@@ -25,12 +25,14 @@ class MockRelationInfoBuilder:
     def build(cls, catalogue: str, collection: str):
         return {
             "some_rel": RelationInfo(
-                relation_table_name="rel_table_for_some_rel",
-                dst_table_name="dst_table_1"
+                relation_table_name="rel_table_for_some_many_rel",
+                dst_table_name="dst_table_1",
+                is_many=True,
             ),
             "some_other_rel": RelationInfo(
-                relation_table_name="rel_table_for_some_other_rel",
-                dst_table_name="dst_table_1"
+                relation_table_name="rel_table_for_some_single_rel",
+                dst_table_name="dst_table_1",
+                is_many=False,
             ),
         }
 
@@ -55,8 +57,8 @@ class TestGobDatabaseConnection(TestCase):
         expected = [
             "events",
             "cat_col",
-            "rel_table_for_some_rel",
-            "rel_table_for_some_other_rel",
+            "rel_table_for_some_many_rel",
+            "rel_table_for_some_single_rel",
         ]
         self.assertEqual(expected, gdc._get_tables_to_reflect())
 
@@ -123,9 +125,16 @@ class TestGobDatabaseConnection(TestCase):
 
         gdc.session.query.assert_has_calls([
             call(gdc.ObjectTable),
-            call().options(mock_selectinload.return_value.selectinload.return_value, mock_selectinload.return_value.selectinload.return_value),
+            call().options(mock_selectinload.return_value.selectinload.return_value),
         ])
         self.assertEqual(gdc.session.query().options(), res)
+
+        mock_selectinload.assert_called_with(gdc.ObjectTable.rel_table_for_some_single_rel_collection)
+
+        mock_selectinload.assert_has_calls([
+            call(gdc.ObjectTable.rel_table_for_some_single_rel_collection),
+            call(gdc.ObjectTable.rel_table_for_some_single_rel_collection).selectinload(gdc.base.classes.rel_table_for_some_single_rel.dst_table_1),
+        ])
 
     def test_get_objects(self):
         gdc = GobDatabaseConnection("cat", "coll", MagicMock())
