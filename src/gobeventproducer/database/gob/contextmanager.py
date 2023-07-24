@@ -90,6 +90,7 @@ class GobDatabaseConnection:
                 getattr(getattr(self.base.classes, relation.relation_table_name), relation.dst_table_name)
             )
             for relation in self.relations.values()
+            if not relation.is_many
         ]
         return query.options(*options)
 

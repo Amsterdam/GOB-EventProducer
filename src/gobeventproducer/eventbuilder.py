@@ -16,7 +16,7 @@ class EventDataBuilder:
         result = {}
         for attr_name, attr in self.collection["fields"].items():
             attr_name_or_alias = attr.get("shortname", attr_name)
-            if "Reference" in attr["type"]:
+            if attr["type"] == "GOB.Reference":
                 relation_obj = []
 
                 if relation := self.relations.get(attr_name):
@@ -34,11 +34,10 @@ class EventDataBuilder:
                             rel["volgnummer"] = dst_table.volgnummer
 
                         relation_obj.append(rel)
-
-                if attr["type"] == "GOB.Reference":
-                    result[attr_name_or_alias] = relation_obj[0] if len(relation_obj) > 0 else {}
-                else:
-                    result[attr_name_or_alias] = relation_obj
+                result[attr_name_or_alias] = relation_obj[0] if len(relation_obj) > 0 else {}
+            elif attr["type"] == "GOB.ManyReference":
+                # Don't add ManyReferences, because they are not used on the receiving end.
+                result[attr_name_or_alias] = []
             else:
                 # Skip relations
                 gob_type = get_gob_type_from_info(attr)

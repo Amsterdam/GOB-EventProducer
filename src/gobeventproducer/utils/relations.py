@@ -11,6 +11,7 @@ class RelationInfo:
 
     relation_table_name: str
     dst_table_name: str
+    is_many: bool
 
 
 class RelationInfoBuilder:
@@ -26,8 +27,11 @@ class RelationInfoBuilder:
                 # Relation is not (yet) defined in GOB
                 continue
             rel_table_name = gob_model.get_table_name("rel", relname)
+            attr = gob_model[catalogue_name]["collections"][collection_name]["fields"][attr_name]
             result[attr_name] = RelationInfo(
-                relation_table_name=rel_table_name, dst_table_name=cls._get_rel_dst_tablename(rel_table_name)
+                relation_table_name=rel_table_name,
+                dst_table_name=cls._get_rel_dst_tablename(rel_table_name),
+                is_many=(attr["type"] == "GOB.ManyReference"),
             )
         return result
 

@@ -79,36 +79,8 @@ class TestEventDataBuilder(TestCase):
             'registratiedatum': datetime(2020, 1, 1, 0, 0),
             'begin_geldigheid': datetime(2020, 1, 1, 9, 0),
             'eind_geldigheid': None,
-            'manyref_to_c': [
-                {
-                    'begin_geldigheid': 'begingeldigheid',
-                    'eind_geldigheid': None,
-                    'id': 'id3',
-                    'tid': 'id3',
-                    'volgnummer': 1
-                },
-                {
-                    'begin_geldigheid': 'begingeldigheid',
-                    'eind_geldigheid': 'eindgeldigheid',
-                    'id': 'id4',
-                    'tid': 'id4',
-                    'volgnummer': 1
-                }
-            ],
-            'manyref_to_d': [
-                {
-                    'begin_geldigheid': 'begingeldigheid',
-                    'eind_geldigheid': None,
-                    'id': 'id7',
-                    'tid': 'id7'
-                },
-                {
-                    'begin_geldigheid': 'begingeldigheid',
-                    'eind_geldigheid': 'eindgeldigheid',
-                    'id': 'id8',
-                    'tid': 'id8'
-                }
-            ],
+            'manyref_to_c': [],
+            'manyref_to_d': [],
             'ref_to_c': {
                 'begin_geldigheid': 'begingeldigheid',
                 'eind_geldigheid': None,
