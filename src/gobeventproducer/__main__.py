@@ -42,7 +42,7 @@ def new_events_notification_handler(msg):
     arguments = {
         "catalogue": notification.header.get("catalogue"),
         "collection": notification.header.get("collection"),
-        "application": notification.header.get("application"),
+        "application": None,  # To avoid that multiple produce jobs run in parallel for different applications
         "process_id": notification.header.get("process_id"),
         "contents": notification.contents,
     }
