@@ -27,7 +27,7 @@ class TestMain(TestCase):
             {
                 "catalogue": "nap",
                 "collection": "peilmerken",
-                "application": "APPL",
+                "application": None,
                 "process_id": "PID",
                 "contents": mock_get_notification.return_value.contents,
             },
