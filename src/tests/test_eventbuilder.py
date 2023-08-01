@@ -42,6 +42,11 @@ class TestEventDataBuilder(TestCase):
 
                 self.__setattr__(dst_name, type("DstTable", (), dst_fields))
 
+        class EmptyRelationObject:
+            def __init__(self, dst_name):
+                self.__setattr__(dst_name, None)
+
+
         class DbObject:
             id = 42
             _gobid = 43
@@ -56,6 +61,7 @@ class TestEventDataBuilder(TestCase):
             manyref_to_d = None
             rel_tst_rta_tst_rtc_ref_to_c_collection = [
                 RelationObject('id1', 'begingeldigheid', None, 'test_catalogue_rel_test_entity_c', True),
+                EmptyRelationObject('test_catalogue_rel_test_entity_c'),
             ]
             rel_tst_rta_tst_rtc_manyref_to_c_collection = [
                 RelationObject('id3', 'begingeldigheid', None, 'test_catalogue_rel_test_entity_c', True),
