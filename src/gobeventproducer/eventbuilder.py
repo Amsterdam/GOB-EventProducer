@@ -23,17 +23,17 @@ class EventDataBuilder:
                     relation_table_rows = getattr(obj, f"{relation.relation_table_name}_collection")
 
                     for row in relation_table_rows:
-                        dst_table = getattr(row, relation.dst_table_name)
-                        rel = {
-                            "tid": dst_table._tid,
-                            "id": dst_table._id,
-                            "begin_geldigheid": str(row.begin_geldigheid) if row.begin_geldigheid else None,
-                            "eind_geldigheid": str(row.eind_geldigheid) if row.eind_geldigheid else None,
-                        }
-                        if hasattr(dst_table, "volgnummer"):
-                            rel["volgnummer"] = dst_table.volgnummer
+                        if (dst_table := getattr(row, relation.dst_table_name)) is not None:
+                            rel = {
+                                "tid": dst_table._tid,
+                                "id": dst_table._id,
+                                "begin_geldigheid": str(row.begin_geldigheid) if row.begin_geldigheid else None,
+                                "eind_geldigheid": str(row.eind_geldigheid) if row.eind_geldigheid else None,
+                            }
+                            if hasattr(dst_table, "volgnummer"):
+                                rel["volgnummer"] = dst_table.volgnummer
 
-                        relation_obj.append(rel)
+                            relation_obj.append(rel)
                 result[attr_name_or_alias] = relation_obj[0] if len(relation_obj) > 0 else {}
             elif attr["type"] == "GOB.ManyReference":
                 # Don't add ManyReferences, because they are not used on the receiving end.
