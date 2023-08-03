@@ -1,0 +1,6 @@
+catalog: meetbouten
+collection: rollagen
+version: 1.1.0
+mapping:
+  identificatie: identificatie
+  is_gemeten_van_bouwblok: is_gemeten_van_gebieden_bouwblok

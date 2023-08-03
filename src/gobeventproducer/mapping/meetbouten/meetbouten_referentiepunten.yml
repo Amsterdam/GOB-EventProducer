@@ -1,0 +1,23 @@
+catalog: meetbouten
+collection: referentiepunten
+version: 1.2.0
+mapping:
+  identificatie: identificatie
+  locatie: locatie
+  hoogte_tov_nap: hoogte_tov_nap
+  datum: datum
+  status_code: status.code
+  status_omschrijving: status.omschrijving
+  vervaldatum: vervaldatum
+  merk_code: merk.code
+  merk_omschrijving: merk.omschrijving
+  x_coordinaat_muurvlak: x_coordinaat_muurvlak
+  y_coordinaat_muurvlak: y_coordinaat_muurvlak
+  windrichting: windrichting
+  ligt_in_bouwblok: ligt_in_gebieden_bouwblok
+  ligt_in_buurt: ligt_in_gebieden_buurt
+  ligt_in_stadsdeel: ligt_in_gebieden_stadsdeel
+  geometrie: geometrie
+  is_nap_peilmerk: is_nap_peilmerk
+  publiceerbaar: publiceerbaar
+  nabij_nummeraanduiding: nabij_adres

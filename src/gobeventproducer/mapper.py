@@ -56,6 +56,10 @@ class EventDataMapper(BaseEventDataMapper):
                     for newkey, oldkey_or_definition in fieldmapping.mapping.items()
                 }
             elif isinstance(fieldmapping, str):
+                if "." in fieldmapping:
+                    # Nested field
+                    first, *rest = fieldmapping.split(".")
+                    return get_value(eventdata.get(first), ".".join(rest))
                 return eventdata.get(fieldmapping)
             else:  # pragma: nocover
                 raise NotImplementedError("Fieldmapping of unexpected type. Please implement.")
