@@ -1,0 +1,16 @@
+catalog: gebieden
+collection: ggpgebieden
+version: 1.1.1
+mapping:
+  identificatie: identificatie
+  volgnummer: volgnummer
+  registratiedatum: registratiedatum
+  naam: naam
+  code: code
+  begin_geldigheid: begin_geldigheid
+  eind_geldigheid: eind_geldigheid
+  documentdatum: documentdatum
+  documentnummer: documentnummer
+  ligt_in_stadsdeel: ligt_in_gebieden_stadsdeel
+  bestaat_uit_buurten: bestaat_uit_gebieden_buurten
+  geometrie: geometrie

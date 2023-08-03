@@ -1,0 +1,20 @@
+catalog: meetbouten
+collection: meetbouten
+version: 1.2.0
+mapping:
+  identificatie: identificatie
+  locatie: locatie
+  status_code: status.code
+  status_omschrijving: status.omschrijving
+  vervaldatum: vervaldatum
+  merk_code: merk.code
+  merk_omschrijving: merk.omschrijving
+  x_coordinaat_muurvlak: x_coordinaat_muurvlak
+  y_coordinaat_muurvlak: y_coordinaat_muurvlak
+  windrichting: windrichting
+  ligt_in_bouwblok: ligt_in_gebieden_bouwblok
+  ligt_in_buurt: ligt_in_gebieden_buurt
+  ligt_in_stadsdeel: ligt_in_gebieden_stadsdeel
+  geometrie: geometrie
+  publiceerbaar: publiceerbaar
+  nabij_nummeraanduiding: nabij_adres

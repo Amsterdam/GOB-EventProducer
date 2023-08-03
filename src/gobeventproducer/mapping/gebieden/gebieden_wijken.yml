@@ -1,0 +1,17 @@
+catalog: gebieden
+collection: wijken
+version: 1.1.2
+mapping:
+  identificatie: identificatie
+  volgnummer: volgnummer
+  registratiedatum: registratiedatum
+  naam: naam
+  code: code
+  begin_geldigheid: begin_geldigheid
+  eind_geldigheid: eind_geldigheid
+  documentdatum: documentdatum
+  documentnummer: documentnummer
+  cbs_code: cbs_code
+  ligt_in_stadsdeel: ligt_in_gebieden_stadsdeel
+  ligt_in_ggwgebied: ligt_in_gebieden_ggwgebied
+  geometrie: geometrie
