@@ -16,6 +16,11 @@ eventdata = {
     "merk_code": 28,
     "merk_omschrijving": "Dit heb ik ook maar verzonnen",
     "valuta": "EUR",
+    "objectje": {
+        "met": {
+            "nested": "veld",
+        }
+    }
 }
 
 
@@ -50,6 +55,7 @@ class TestEventDataMapper(TestCase):
                 "code": 28,
                 "omschrijving": "Dit heb ik ook maar verzonnen",
             },
+            "vanuit_nested_veld": "veld",
         }
 
         self.assertEqual(expected, self.mapper.map(eventdata))

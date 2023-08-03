@@ -1,0 +1,19 @@
+catalog: meetbouten
+collection: metingen
+version: 1.0.0
+mapping:
+  identificatie: identificatie
+  hoort_bij_meetbout: hoort_bij_meetbouten_meetbout
+  datum: datum
+  type_meting: type_meting
+  wijze_van_inwinnen_code: wijze_van_inwinnen.code
+  wijze_van_inwinnen_omschrijving: wijze_van_inwinnen.omschrijving
+  hoogte_tov_nap: hoogte_tov_nap
+  zakking: zakking
+  refereert_aan_referentiepunten: refereert_aan_meetbouten_referentiepunten
+  zakkingssnelheid: zakkingssnelheid
+  zakking_cumulatief: zakking_cumulatief
+  is_gemeten_door: is_gemeten_door
+  hoeveelste_meting: hoeveelste_meting
+  aantal_dagen: aantal_dagen
+  publiceerbaar: publiceerbaar

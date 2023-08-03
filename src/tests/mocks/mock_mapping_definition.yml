@@ -10,3 +10,4 @@ mapping:
     mapping:
       code: merk_code
       omschrijving: merk_omschrijving
+  vanuit_nested_veld: objectje.met.nested
