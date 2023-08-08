@@ -13,7 +13,12 @@ from gobeventproducer import gob_model
 from gobeventproducer.database.gob.contextmanager import GobDatabaseConnection
 from gobeventproducer.database.local.contextmanager import LocalDatabaseConnection
 from gobeventproducer.eventbuilder import EventDataBuilder
-from gobeventproducer.mapper import EventDataMapper, PassThroughEventDataMapper, RelationEventDataMapper
+from gobeventproducer.mapper import (
+    EventDataMapper,
+    PassThroughEventDataMapper,
+    RelationEventDataMapper,
+    ReverseMappingNotFound,
+)
 from gobeventproducer.mapping import MappingDefinitionLoader
 from gobeventproducer.naming import camel_case
 
@@ -69,6 +74,12 @@ class BatchEventsMessagePublisher:
             self.events = []
 
 
+class RelationNotProducibleException(Exception):
+    """Thrown when a relation is not producible, i.e. when the relation is not defined in the destination schema."""
+
+    pass
+
+
 class EventProducer:
     """Produce events for external consumers."""
 
@@ -91,7 +102,12 @@ class EventProducer:
                 EventDataMapper(main_mapping_definition) if main_mapping_definition else PassThroughEventDataMapper()
             )
             relation_name = NameCompressor.uncompress_name(relation_name)
-            relation_name = main_mapper.get_mapped_name_reverse(relation_name)
+
+            try:
+                relation_name = main_mapper.get_mapped_name_reverse(relation_name)
+            except ReverseMappingNotFound:
+                raise RelationNotProducibleException()
+
             event_collection_name = f"{main_collection_name}_{camel_case(relation_name)}"
 
             self.mapper = RelationEventDataMapper()

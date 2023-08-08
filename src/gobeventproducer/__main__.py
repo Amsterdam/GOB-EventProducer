@@ -14,7 +14,7 @@ from gobcore.workflow.start_workflow import start_workflow
 from gobeventproducer import gob_model
 from gobeventproducer.config import LISTEN_TO_CATALOGS
 from gobeventproducer.database.local.connection import connect
-from gobeventproducer.producer import EventProducer
+from gobeventproducer.producer import EventProducer, RelationNotProducibleException
 
 
 def _listening_to_catalogue_collection(notification: EventNotification):
@@ -56,7 +56,20 @@ def event_produce_handler(msg):
 
     assert catalogue and collection, "Missing catalogue and collection in header"
 
-    event_producer = EventProducer(catalogue, collection, logger)
+    try:
+        event_producer = EventProducer(catalogue, collection, logger)
+    except RelationNotProducibleException:
+        logger.info(
+            f"Relation is not producible because it is not defined in the destination schema: "
+            f"{catalogue}.{collection}. Skipping."
+        )
+        return {
+            "header": msg["header"],
+            "summary": {
+                "produced": 0,
+            },
+        }
+
     mode = msg.get("header", {}).get("mode")
 
     if mode == "full":
