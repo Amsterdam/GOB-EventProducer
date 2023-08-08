@@ -32,6 +32,12 @@ class PassThroughEventDataMapper(BaseEventDataMapper):
         return eventdata
 
 
+class ReverseMappingNotFound(Exception):
+    """Thrown when a reverse mapping cannot be found."""
+
+    pass
+
+
 class EventDataMapper(BaseEventDataMapper):
     """Map the internal GOB data to an event for a specific Amsterdam Schema version."""
 
@@ -44,7 +50,7 @@ class EventDataMapper(BaseEventDataMapper):
             if newname == name:
                 return oldname
 
-        raise Exception(f"{name} cannot be found")
+        raise ReverseMappingNotFound(f"{name} cannot be found")
 
     def map(self, eventdata: EventData) -> EventData:
         """Map the eventdata to the desired format."""

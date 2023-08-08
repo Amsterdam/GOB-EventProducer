@@ -3,7 +3,7 @@ from unittest import TestCase
 from unittest.mock import MagicMock, call, patch
 
 from gobeventproducer.mapper import PassThroughEventDataMapper, RelationEventDataMapper
-from gobeventproducer.producer import EventProducer, BatchEventsMessagePublisher
+from gobeventproducer.producer import EventProducer, BatchEventsMessagePublisher, RelationNotProducibleException
 
 
 class MockEvent:
@@ -103,6 +103,10 @@ class TestEventProducer(TestCase):
             "collection": "peilmerken_ligtInBouwblok",
         }, p.header_data)
         self.assertEqual("nap.peilmerken.rel.peilmerken_ligtInBouwblok", p.routing_key)
+
+    def test_init_rel_catalog_not_producible(self):
+        with self.assertRaises(RelationNotProducibleException):
+            EventProducer("rel", "gbd_brt_brk_gme_ligt_in_brk_gemeente", MagicMock())
 
     def test_init_compressed_name(self):
         p = EventProducer("rel", "brk2_akt_brk2_kot__hft_btrk_op_brk_kot_", MagicMock())
