@@ -2,6 +2,7 @@ from unittest import TestCase
 from unittest.mock import MagicMock, call, patch
 
 from gobeventproducer.__main__ import event_produce_handler, new_events_notification_handler
+from gobeventproducer.producer import RelationNotProducibleException
 
 
 class TestMain(TestCase):
@@ -133,6 +134,30 @@ class TestMain(TestCase):
 
         with self.assertRaises(AssertionError):
             event_produce_handler({})
+
+    @patch("gobeventproducer.__main__.logger")
+    @patch("gobeventproducer.__main__.EventProducer")
+    def test_event_produce_handler_not_producible(self, mock_producer, mock_logger):
+        msg = {
+            "header": {
+                "catalogue": "rel",
+                "collection": "some_relation_collection",
+                "mode": "full",
+            }
+        }
+        mock_producer.side_effect = RelationNotProducibleException()
+
+        result = event_produce_handler(msg)
+
+        self.assertEquals(result, {
+            "header": msg["header"],
+            "summary": {
+                "produced": 0,
+            }
+        })
+
+        mock_logger.info.assert_called_with("Relation is not producible because it is not defined in the "
+                                            "destination schema: rel.some_relation_collection. Skipping.")
 
     @patch("gobeventproducer.__main__.connect")
     @patch("gobeventproducer.__main__.MessagedrivenService")
