@@ -27,11 +27,11 @@ node('GOBBUILD') {
         stage('Test') {
             lock("gob-eventproducer-test") {
                 tryStep "test", {
-                    sh "docker-compose -p GOB-EventProducer_service -f src/.jenkins/test/docker-compose.yml build --no-cache && " +
-                       "docker-compose -p GOB-EventProducer_service -f src/.jenkins/test/docker-compose.yml run --rm test"
+                    sh "docker-compose -p gob_eventproducer_service -f src/.jenkins/test/docker-compose.yml build --no-cache && " +
+                       "docker-compose -p gob_eventproducer_service -f src/.jenkins/test/docker-compose.yml run --rm test"
 
                 }, {
-                    sh "docker-compose -p GOB-EventProducer_service -f src/.jenkins/test/docker-compose.yml down"
+                    sh "docker-compose -p gob_eventproducer_service -f src/.jenkins/test/docker-compose.yml down"
                 }
             }
         }
