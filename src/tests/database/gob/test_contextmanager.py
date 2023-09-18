@@ -113,9 +113,9 @@ class TestGobDatabaseConnection(TestCase):
             "eventid > 824",
         )
 
-
     @patch("gobeventproducer.database.gob.contextmanager.selectinload")
-    def test_query_object(self, mock_selectinload):
+    @patch("gobeventproducer.database.gob.contextmanager.with_loader_criteria")
+    def test_query_object(self, mock_loader_criteria, mock_selectinload):
         gdc = GobDatabaseConnection("cat", "coll", MagicMock())
         gdc.ObjectTable = MagicMock()
         gdc.session = MagicMock()
@@ -125,7 +125,10 @@ class TestGobDatabaseConnection(TestCase):
 
         gdc.session.query.assert_has_calls([
             call(gdc.ObjectTable),
-            call().options(mock_selectinload.return_value.selectinload.return_value),
+            call().options(
+                mock_selectinload.return_value.selectinload.return_value,
+                mock_loader_criteria.return_value
+            ),
         ])
         self.assertEqual(gdc.session.query().options(), res)
 
@@ -133,8 +136,13 @@ class TestGobDatabaseConnection(TestCase):
 
         mock_selectinload.assert_has_calls([
             call(gdc.ObjectTable.rel_table_for_some_single_rel_collection),
-            call(gdc.ObjectTable.rel_table_for_some_single_rel_collection).selectinload(gdc.base.classes.rel_table_for_some_single_rel.dst_table_1),
+            call(gdc.ObjectTable.rel_table_for_some_single_rel_collection).selectinload(gdc.base.classes.rel_table_for_some_single_rel.dst_table_1)
         ])
+        mock_loader_criteria.assert_called_with(
+            gdc.base.classes.rel_table_for_some_single_rel,
+            gdc.base.classes.rel_table_for_some_single_rel._date_deleted.is_.return_value
+        )
+        gdc.base.classes.rel_table_for_some_single_rel._date_deleted.is_.assert_called_with(None)
 
     def test_get_objects(self):
         gdc = GobDatabaseConnection("cat", "coll", MagicMock())
