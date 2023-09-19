@@ -4,7 +4,7 @@ from sqlalchemy import MetaData, and_, create_engine
 from sqlalchemy import exc as sa_exc
 from sqlalchemy.engine.url import URL
 from sqlalchemy.ext.automap import automap_base
-from sqlalchemy.orm import Session, selectinload
+from sqlalchemy.orm import Session, selectinload, with_loader_criteria
 
 from gobeventproducer import gob_model
 from gobeventproducer.config import GOB_DATABASE_CONFIG
@@ -84,14 +84,23 @@ class GobDatabaseConnection:
 
     def _query_object(self):
         query = self.session.query(self.ObjectTable)
-        options = [
-            # Eager load relation tables and dst table
-            selectinload(getattr(self.ObjectTable, f"{relation.relation_table_name}_collection")).selectinload(
-                getattr(getattr(self.base.classes, relation.relation_table_name), relation.dst_table_name)
-            )
-            for relation in self.relations.values()
-            if not relation.is_many
-        ]
+        options = []
+
+        for relation in self.relations.values():
+            if relation.is_many:
+                continue
+
+            rel_src_attr = getattr(self.ObjectTable, f"{relation.relation_table_name}_collection")
+            rel_obj = getattr(self.base.classes, relation.relation_table_name)
+            rel_dst_attr = getattr(rel_obj, relation.dst_table_name)
+            rel_date_deleted = getattr(rel_obj, "_date_deleted")
+
+            # Eager load relation tables and dst table, skip deleted
+            options += [
+                selectinload(rel_src_attr).selectinload(rel_dst_attr),
+                with_loader_criteria(rel_obj, rel_date_deleted.is_(None)),
+            ]
+
         return query.options(*options)
 
     def get_objects(self):
