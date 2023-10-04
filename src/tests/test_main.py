@@ -69,9 +69,10 @@ class TestMain(TestCase):
         mock_start_workflow.reset_mock()
 
 
+    @patch("gobeventproducer.__main__.trigger_event_produce_for_all_collections")
     @patch("gobeventproducer.__main__.logger")
     @patch("gobeventproducer.__main__.EventProducer")
-    def test_event_produce_handler(self, mock_producer, mock_logger):
+    def test_event_produce_handler(self, mock_producer, mock_logger, mock_trigger_for_all):
         msg = {
             "header": {
                 "catalogue": "CAT",
@@ -101,6 +102,22 @@ class TestMain(TestCase):
 
         with self.assertRaises(AssertionError):
             event_produce_handler({})
+
+        mock_trigger_for_all.return_value = 241
+        msg = {
+            "header": {
+                "catalogue": "CAT",
+            }
+        }
+        res = event_produce_handler(msg)
+        self.assertEqual({
+            "header": msg["header"],
+            "summary": {
+                "produced": 0,
+                "triggered_jobs_cnt": 241,
+            }
+        }, res)
+        mock_trigger_for_all.assert_called_with(msg, "CAT")
 
     @patch("gobeventproducer.__main__.logger")
     @patch("gobeventproducer.__main__.EventProducer")
