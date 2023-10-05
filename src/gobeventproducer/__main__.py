@@ -15,6 +15,7 @@ from gobeventproducer import gob_model
 from gobeventproducer.config import LISTEN_TO_CATALOGS
 from gobeventproducer.database.local.connection import connect
 from gobeventproducer.producer import EventProducer, RelationNotProducibleException
+from gobeventproducer.splitjob import trigger_event_produce_for_all_collections
 
 
 def _listening_to_catalogue_collection(notification: EventNotification):
@@ -54,7 +55,18 @@ def event_produce_handler(msg):
     catalogue = msg.get("header", {}).get("catalogue")
     collection = msg.get("header", {}).get("collection")
 
-    assert catalogue and collection, "Missing catalogue and collection in header"
+    assert catalogue, "Missing catalogue in header"
+
+    if not collection:
+        triggered_jobs_cnt = trigger_event_produce_for_all_collections(msg, catalogue)
+        logger.info(f"Only catalogue {catalogue} was specified, {triggered_jobs_cnt} new jobs were triggered.")
+        return {
+            "header": msg["header"],
+            "summary": {
+                "produced": 0,
+                "triggered_jobs_cnt": triggered_jobs_cnt,
+            },
+        }
 
     try:
         event_producer = EventProducer(catalogue, collection, logger)
