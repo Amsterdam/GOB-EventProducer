@@ -19,6 +19,9 @@ def _start_workflow(original_msg: dict[str, Any], catalogue: str, collection: st
             "workflow_name": "event_produce",
         },
     }
+    del new_msg["header"]["jobid"]
+    del new_msg["header"]["stepid"]
+
     with MessageBrokerConnection(CONNECTION_PARAMS) as connection:
         connection.publish(WORKFLOW_EXCHANGE, WORKFLOW_REQUEST_KEY, new_msg)
 
