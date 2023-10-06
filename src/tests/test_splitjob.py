@@ -78,6 +78,7 @@ class TestSplitjob(TestCase):
         msg = {
             "header": {
                 "jobid": 42,
+                "stepid": 3,
                 "catalogue": "brk2",
             }
         }
@@ -89,7 +90,6 @@ class TestSplitjob(TestCase):
             WORKFLOW_REQUEST_KEY,
             {
                 "header": {
-                    "jobid": 42,
                     "catalogue": "some cat",
                     "collection": "some coll",
                     "split_from": 42,
