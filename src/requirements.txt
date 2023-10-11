@@ -1,6 +1,6 @@
-alembic==1.9.3
--e git+https://github.com/Amsterdam/GOB-Config.git@v0.14.0#egg=gobconfig
--e git+https://github.com/Amsterdam/GOB-Core.git@v2.19.1#egg=gobcore
+alembic~=1.11.3
+git+https://github.com/Amsterdam/GOB-Config.git@v0.14.2
+git+https://github.com/Amsterdam/GOB-Core.git@v2.22.0
 freezegun==1.2.2
-more-itertools==9.1.0
-types-PyYAML==6.0.12.8
+more-itertools~=10.1.0
+types-PyYAML~=6.0.12.12
